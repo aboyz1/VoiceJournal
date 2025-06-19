@@ -1,22 +1,33 @@
-import axios from 'axios';
-
 type STTResponse = {
   text: string;
   confidence: number;
   language: string;
 };
 
-export const transcribeAudio = async (audioUri: string): Promise<STTResponse> => {
+export const transcribeAudio = async (
+  audioUri: string
+): Promise<STTResponse> => {
+  // Demo/mock response for development
+  return new Promise<STTResponse>((resolve) => {
+    setTimeout(() => {
+      resolve({
+        text: "This is a demo transcription of your audio entry.",
+        confidence: 0.98,
+        language: "en-US",
+      });
+    }, 1200);
+  });
+
+  // Uncomment below to use real API
+  /*
   try {
-    // Create FormData with the audio file
     const formData = new FormData();
     formData.append('audio', {
       uri: audioUri,
-      type: 'audio/m4a', // Match your recording format
+      type: 'audio/m4a',
       name: 'recording.m4a',
     } as any);
 
-    // Replace with your actual STT API endpoint
     const response = await axios.post('https://api.your-stt-service.com/v1/transcribe', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -33,4 +44,5 @@ export const transcribeAudio = async (audioUri: string): Promise<STTResponse> =>
     console.error('STT Error:', error);
     throw new Error('Transcription failed. Please try again.');
   }
+  */
 };

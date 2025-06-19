@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-export type Mood = 'happy' | 'sad' | 'angry' | 'neutral' | 'excited' | 'calm';
+export type Mood = "happy" | "sad" | "angry" | "neutral" | "excited" | "calm";
 
 type NLPAnalysis = {
   mood: Mood;
@@ -11,8 +9,22 @@ type NLPAnalysis = {
 };
 
 export const analyzeText = async (text: string): Promise<NLPAnalysis> => {
+  // Demo/mock response for development
+  return new Promise<NLPAnalysis>((resolve) => {
+    setTimeout(() => {
+      resolve({
+        mood: "happy",
+        confidence: 0.95,
+        keywords: ["journal", "voice", "entry"],
+        summary: "A positive voice journal entry.",
+        sentimentScore: 0.7,
+      });
+    }, 1000);
+  });
+
+  // Uncomment below to use real API
+  /*
   try {
-    // Replace with your actual NLP API endpoint
     const response = await axios.post('https://api.your-nlp-service.com/v1/analyze', {
       text,
       features: ['sentiment', 'keywords', 'summary'],
@@ -33,13 +45,14 @@ export const analyzeText = async (text: string): Promise<NLPAnalysis> => {
     console.error('NLP Error:', error);
     throw new Error('Analysis failed. Please try again.');
   }
+  */
 };
 
 // Helper function to convert sentiment score to mood categories
 const mapSentimentToMood = (score: number): Mood => {
-  if (score > 0.6) return 'excited';
-  if (score > 0.3) return 'happy';
-  if (score > -0.3) return 'neutral';
-  if (score > -0.6) return 'sad';
-  return 'angry';
+  if (score > 0.6) return "excited";
+  if (score > 0.3) return "happy";
+  if (score > -0.3) return "neutral";
+  if (score > -0.6) return "sad";
+  return "angry";
 };
