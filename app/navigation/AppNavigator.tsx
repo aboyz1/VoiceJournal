@@ -16,7 +16,7 @@ export type RootStackParamList = {
   Home: undefined; // Tab name
   Journal: undefined;
   HomeScreen: undefined; // Stack screen name
-  Review: { audioUri: string };
+  Review: { audioUri: string; entryId?: string };
 };
 
 const Tab = createBottomTabNavigator<RootStackParamList>();
