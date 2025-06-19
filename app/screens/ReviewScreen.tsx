@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import { RouteProp, useRoute } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import React, { useState } from "react";
 import {
-  ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -10,279 +11,296 @@ import {
   View,
 } from "react-native";
 import { RootStackParamList } from "../navigation/AppNavigator";
-import { analyzeText, Mood } from "../services/NLPService";
-import { transcribeAudio } from "../services/STTService";
 
 type ReviewScreenRouteProp = RouteProp<RootStackParamList, "Review">;
 
-type Entry = {
-  id: string;
-  audioUri: string;
-  text: string;
-  mood: Mood;
-  date: Date;
-  isEditing: boolean;
-};
-
 const ReviewScreen = () => {
-  const [entry, setEntry] = useState<Entry | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Get the audioUri from navigation params
+  const [isEditing, setIsEditing] = useState(false);
+  const [text, setText] = useState(
+    "This is a demo transcription of your audio entry."
+  );
   const route = useRoute<ReviewScreenRouteProp>();
-  const { audioUri } = route.params;
-
-  useEffect(() => {
-    const processRecording = async () => {
-      if (audioUri) {
-        await processNewRecording(audioUri);
-      }
-    };
-
-    processRecording();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audioUri]);
-
-  const processNewRecording = async (audioUri: string) => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Step 1: Transcribe audio
-      const transcription = await transcribeAudio(audioUri);
-
-      // Step 2: Analyze text
-      const analysis = await analyzeText(transcription.text);
-
-      // Create new entry
-      setEntry({
-        id: Date.now().toString(),
-        audioUri,
-        text: transcription.text,
-        mood: analysis.mood,
-        date: new Date(),
-        isEditing: false,
-      });
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("An unknown error occurred.");
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSave = () => {
-    if (!entry) return;
-
-    // Save to database (to be implemented)
-    console.log("Saving entry:", entry);
-    setEntry({
-      ...entry,
-      isEditing: false,
-    });
-  };
-
-  const handleEdit = () => {
-    if (!entry) return;
-    setEntry({
-      ...entry,
-      isEditing: true,
-    });
-  };
-
-  const handleTextChange = (text: string) => {
-    if (!entry) return;
-    setEntry({
-      ...entry,
-      text,
-    });
-  };
-
-  const getMoodColor = (mood: Mood): string => {
-    const moodColors = {
-      happy: "#4CAF50",
-      sad: "#2196F3",
-      angry: "#F44336",
-      neutral: "#9E9E9E",
-      excited: "#FFC107",
-      calm: "#673AB7",
-    };
-    return moodColors[mood];
-  };
-
-  if (isLoading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#ff4757" />
-        <Text style={styles.statusText}>Processing your journal entry...</Text>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <Ionicons name="warning" size={48} color="#ff4757" />
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => entry && processNewRecording(entry.audioUri)}
-        >
-          <Text style={styles.retryButtonText}>Try Again</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (!entry) {
-    return (
-      <View style={styles.container}>
-        <Text>No entry to review</Text>
-      </View>
-    );
-  }
+  const navigation = useNavigation();
+  
+  // Add safety check for route params
+  const audioUri = route.params?.audioUri || '';
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.dateText}>
-          {entry.date.toLocaleDateString()} • {entry.date.toLocaleTimeString()}
-        </Text>
-        <View
-          style={[
-            styles.moodPill,
-            { backgroundColor: getMoodColor(entry.mood) },
-          ]}
-        >
-          <Text style={styles.moodText}>{entry.mood.toUpperCase()}</Text>
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Header with back button and title */}
+        <View style={styles.header}>
+
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="chevron-back" size={24} color="#000" />
+          </TouchableOpacity>
+          <Text style={styles.screenTitle}>Journal Entry</Text>
+          <View style={{ width: 24 }} />
         </View>
-      </View>
 
-      {entry.isEditing ? (
-        <TextInput
-          style={[styles.textInput, styles.editableText]}
-          multiline
-          value={entry.text}
-          onChangeText={handleTextChange}
-          autoFocus
-        />
-      ) : (
-        <Text style={styles.text}>{entry.text}</Text>
-      )}
+        {/* Date and time section */}
+        <View style={styles.dateContainer}>
+          <Text style={styles.dateText}>6/19/2025 • 1:32 PM</Text>
+        </View>
 
-      <View style={styles.buttonContainer}>
-        {entry.isEditing ? (
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <Ionicons name="save" size={24} color="white" />
-            <Text style={styles.buttonText}>Save</Text>
+        {/* Audio player section */}
+        <View style={styles.audioPlayer}>
+          <TouchableOpacity style={styles.playButton}>
+            <Ionicons name="play" size={24} color="#fff" />
           </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
-            <Ionicons name="create" size={24} color="white" />
-            <Text style={styles.buttonText}>Edit</Text>
-          </TouchableOpacity>
-        )}
+          <View style={styles.progressBar}>
+            <View style={styles.progressFill} />
+          </View>
+          <Text style={styles.durationText}>1:23</Text>
+        </View>
+
+        {/* Transcription section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Transcription</Text>
+          {isEditing ? (
+            <TextInput
+              style={styles.textInput}
+              multiline
+              value={text}
+              onChangeText={setText}
+              autoFocus
+            />
+          ) : (
+            <View style={styles.transcriptionBox}>
+              <Text style={styles.transcriptionText}>{text}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Mood analysis section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Mood Analysis</Text>
+          <View style={styles.moodContainer}>
+            <View style={[styles.moodPill, { backgroundColor: "#FFD700" }]}>
+              <Ionicons name="happy" size={16} color="#fff" />
+              <Text style={styles.moodText}>HAPPY</Text>
+            </View>
+            <Text style={styles.moodDescription}>
+              Positive sentiment detected
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Footer with action buttons */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => setIsEditing(!isEditing)}
+        >
+          <Ionicons
+            name={isEditing ? "close" : "create"}
+            size={20}
+            color="#007AFF"
+          />
+          <Text style={styles.secondaryButtonText}>
+            {isEditing ? "Cancel" : "Edit"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => {
+            if (isEditing) setIsEditing(false);
+            // Save functionality here
+          }}
+        >
+          <Ionicons
+            name={isEditing ? "checkmark" : "save"}
+            size={20}
+            color="#fff"
+          />
+          <Text style={styles.buttonText}>
+            {isEditing ? "Save Changes" : "Save Entry"}
+          </Text>
+        </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#F8F9FA",
+  },
+  scrollContainer: {
+    padding: 16,
+    paddingBottom: 80,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 24,
+  },
+  backButton: {
+    padding: 8,
+  },
+  screenTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#1A1A1A",
+  },
+  dateContainer: {
     marginBottom: 20,
   },
   dateText: {
-    color: "#6c757d",
     fontSize: 14,
+    color: "#6C757D",
   },
-  moodPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  audioPlayer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  playButton: {
+    backgroundColor: "#007AFF",
+    width: 40,
+    height: 40,
     borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
   },
-  moodText: {
-    color: "white",
-    fontWeight: "bold",
-    fontSize: 12,
+  progressBar: {
+    flex: 1,
+    height: 4,
+    backgroundColor: "#E9ECEF",
+    borderRadius: 2,
+    marginRight: 16,
   },
-  text: {
+  progressFill: {
+    width: "60%",
+    height: "100%",
+    backgroundColor: "#007AFF",
+    borderRadius: 2,
+  },
+  durationText: {
+    fontSize: 14,
+    color: "#6C757D",
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1A1A1A",
+    marginBottom: 12,
+  },
+  transcriptionBox: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  transcriptionText: {
     fontSize: 16,
     lineHeight: 24,
-    color: "#212529",
-    marginBottom: 20,
+    color: "#333333",
   },
   textInput: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
     fontSize: 16,
     lineHeight: 24,
-    color: "#212529",
-    marginBottom: 20,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    borderRadius: 8,
+    color: "#333333",
     minHeight: 150,
+    textAlignVertical: "top",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  editableText: {
-    backgroundColor: "white",
+  moodContainer: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  buttonContainer: {
+  moodPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  moodText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 12,
+    marginLeft: 6,
+  },
+  moodDescription: {
+    fontSize: 14,
+    color: "#6C757D",
+  },
+  footer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 16,
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#E9ECEF",
+  },
+  primaryButton: {
+    flex: 1,
     flexDirection: "row",
     justifyContent: "center",
-    marginTop: 20,
-  },
-  editButton: {
-    flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ff4757",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+    backgroundColor: "#007AFF",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginLeft: 8,
   },
-  saveButton: {
+  secondaryButton: {
+    flex: 1,
     flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#28a745",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#007AFF",
+    marginRight: 8,
   },
   buttonText: {
-    color: "white",
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 16,
     marginLeft: 8,
-    fontWeight: "bold",
   },
-  statusText: {
-    marginTop: 20,
-    color: "#6c757d",
-  },
-  errorText: {
-    marginTop: 20,
-    color: "#dc3545",
-    textAlign: "center",
-    paddingHorizontal: 20,
-  },
-  retryButton: {
-    marginTop: 20,
-    backgroundColor: "#ff4757",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: "white",
-    fontWeight: "bold",
+  secondaryButtonText: {
+    color: "#007AFF",
+    fontWeight: "600",
+    fontSize: 16,
+    marginLeft: 8,
   },
 });
 
