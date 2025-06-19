@@ -18,6 +18,7 @@ import { JournalEntry } from '../data/schemas';
 import { formatDateTime, formatDuration } from '../utils/dateUtils';
 import { getMoodConfig } from '../utils/moodUtils';
 import { showErrorAlert } from '../utils/alertUtils';
+import { theme } from '../theme/theme';
 
 type EntryDetailRouteProp = RouteProp<RootStackParamList, 'EntryDetail'>;
 
@@ -120,7 +121,7 @@ const EntryDetailScreen = () => {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={theme.colors.secondary} />
       </SafeAreaView>
     );
   }
@@ -128,7 +129,7 @@ const EntryDetailScreen = () => {
   if (error) {
     return (
       <SafeAreaView style={styles.errorContainer}>
-        <Ionicons name="warning" size={48} color="#FF3B30" />
+        <Ionicons name="warning" size={48} color={theme.colors.error} />
         <Text style={styles.errorText}>{error}</Text>
       </SafeAreaView>
     );
@@ -137,7 +138,7 @@ const EntryDetailScreen = () => {
   if (!entry) {
     return (
       <SafeAreaView style={styles.emptyContainer}>
-        <Text>Entry not found</Text>
+        <Text style={styles.emptyText}>Entry not found</Text>
       </SafeAreaView>
     );
   }
@@ -156,7 +157,7 @@ const EntryDetailScreen = () => {
             <Ionicons 
               name={moodConfig.icon as any} 
               size={16} 
-              color="white" 
+              color={theme.colors.surface} 
             />
             <Text style={styles.moodText}>{moodConfig.displayName.toUpperCase()}</Text>
           </View>
@@ -172,7 +173,7 @@ const EntryDetailScreen = () => {
             <Ionicons 
               name={isPlaying ? "pause" : "play"} 
               size={24} 
-              color="#FFFFFF" 
+              color={theme.colors.surface} 
             />
           </TouchableOpacity>
           
@@ -183,9 +184,9 @@ const EntryDetailScreen = () => {
               maximumValue={duration}
               value={position}
               onSlidingComplete={handleSliderValueChange}
-              minimumTrackTintColor="#007AFF"
-              maximumTrackTintColor="#E5E5EA"
-              thumbTintColor="#007AFF"
+              minimumTrackTintColor={theme.colors.secondary}
+              maximumTrackTintColor={theme.colors.border}
+              thumbTintColor={theme.colors.secondary}
               disabled={!sound}
             />
             
@@ -208,77 +209,80 @@ const EntryDetailScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background,
   },
   scrollContainer: {
-    padding: 16,
-    paddingBottom: 24,
+    padding: theme.spacing.base,
+    paddingBottom: theme.spacing.xl,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.background,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: theme.spacing.xl,
+    backgroundColor: theme.colors.background,
   },
   errorText: {
-    fontSize: 16,
-    color: '#FF3B30',
-    marginTop: 16,
+    fontSize: theme.typography.fontSize.md,
+    color: theme.colors.error,
+    marginTop: theme.spacing.base,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.background,
+  },
+  emptyText: {
+    fontSize: theme.typography.fontSize.md,
+    color: theme.colors.textTertiary,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing.xl,
   },
   dateText: {
-    fontSize: 14,
-    color: '#8E8E93',
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textTertiary,
   },
   moodContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.full,
   },
   moodText: {
-    color: '#FFFFFF',
-    fontSize: 12,
+    color: theme.colors.surface,
+    fontSize: theme.typography.fontSize.xs,
     fontWeight: '600',
-    marginLeft: 6,
+    marginLeft: theme.spacing.xs,
   },
   audioPlayer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.base,
+    marginBottom: theme.spacing.xl,
+    ...theme.shadows.base,
   },
   playButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.secondary,
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: theme.borderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: theme.spacing.base,
   },
   progressContainer: {
     flex: 1,
@@ -290,27 +294,22 @@ const styles = StyleSheet.create({
   timeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 4,
+    marginTop: theme.spacing.xs,
   },
   timeText: {
-    fontSize: 12,
-    color: '#8E8E93',
+    fontSize: theme.typography.fontSize.xs,
+    color: theme.colors.textTertiary,
   },
   contentContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.base,
+    ...theme.shadows.base,
   },
   contentText: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#1C1C1E',
+    fontSize: theme.typography.fontSize.md,
+    lineHeight: theme.typography.fontSize.xl,
+    color: theme.colors.textPrimary,
   },
 });
-
 export default EntryDetailScreen;

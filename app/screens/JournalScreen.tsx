@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, SafeAreaView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, SafeAreaView, TouchableOpacity, ViewStyle, TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -9,6 +9,7 @@ import { initDatabase } from '../data/Database';
 import { JournalEntry } from '../data/schemas';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { showErrorAlert } from '../utils/alertUtils';
+import { theme } from '../theme/theme';
 
 type JournalScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -21,10 +22,7 @@ const JournalScreen = () => {
   useEffect(() => {
     const initializeAndLoadEntries = async () => {
       try {
-        // Initialize database first
         await initDatabase();
-        
-        // Then load entries
         const loadedEntries = await getAllEntries();
         setEntries(loadedEntries);
       } catch (err) {
@@ -62,7 +60,7 @@ const JournalScreen = () => {
   if (loading && entries.length === 0) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={theme.colors.secondary} />
         <Text style={styles.loadingText}>Loading entries...</Text>
       </SafeAreaView>
     );
@@ -71,7 +69,7 @@ const JournalScreen = () => {
   if (error && entries.length === 0) {
     return (
       <SafeAreaView style={styles.errorContainer}>
-        <Ionicons name="warning" size={48} color="#FF3B30" />
+        <Ionicons name="warning" size={48} color={theme.colors.error} />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity 
           style={styles.retryButton}
@@ -91,14 +89,14 @@ const JournalScreen = () => {
           <Ionicons 
             name="refresh" 
             size={24} 
-            color={loading ? "#8E8E93" : "#007AFF"} 
+            color={loading ? theme.colors.textTertiary : theme.colors.secondary} 
           />
         </TouchableOpacity>
       </View>
 
       {entries.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="journal" size={64} color="#8E8E93" />
+          <Ionicons name="journal" size={64} color={theme.colors.textTertiary} />
           <Text style={styles.emptyText}>No entries yet</Text>
           <Text style={styles.emptySubtext}>Your recorded entries will appear here</Text>
         </View>
@@ -125,75 +123,77 @@ const JournalScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
-    paddingHorizontal: 16,
-  },
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.spacing.base,
+  } as ViewStyle,
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
+    backgroundColor: theme.colors.background,
+  } as ViewStyle,
   loadingText: {
-    fontSize: 16,
-    color: '#8E8E93',
-    marginTop: 12,
-  },
+    fontSize: theme.typography.fontSize.md,
+    color: theme.colors.textTertiary,
+    marginTop: theme.spacing.md,
+  } as TextStyle,
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
-  },
+    padding: theme.spacing.xl,
+    backgroundColor: theme.colors.background,
+  } as ViewStyle,
   errorText: {
-    fontSize: 16,
-    color: '#FF3B30',
-    marginTop: 16,
+    fontSize: theme.typography.fontSize.md,
+    color: theme.colors.error,
+    marginTop: theme.spacing.base,
     textAlign: 'center',
-  },
+  } as TextStyle,
   retryButton: {
-    marginTop: 24,
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
+    marginTop: theme.spacing.xl,
+    backgroundColor: theme.colors.secondary,
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.base,
+  } as ViewStyle,
   retryButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
+    color: theme.colors.surface,
+    fontWeight: theme.typography.fontWeight.semibold,
+  } as TextStyle,
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-    marginTop: 8,
-  },
+    marginBottom: theme.spacing.base,
+    marginTop: theme.spacing.sm,
+  } as ViewStyle,
   title: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#1C1C1E',
-  },
+    fontSize: theme.typography.fontSize['2xl'],
+    fontWeight: theme.typography.fontWeight.semibold,
+    color: theme.colors.textPrimary,
+  } as TextStyle,
   listContent: {
-    paddingBottom: 24,
-  },
+    paddingBottom: theme.spacing.xl,
+  } as ViewStyle,
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
-  },
+    padding: theme.spacing.xl,
+  } as ViewStyle,
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginTop: 16,
-  },
+    fontSize: theme.typography.fontSize.lg,
+    fontWeight: theme.typography.fontWeight.semibold,
+    color: theme.colors.textPrimary,
+    marginTop: theme.spacing.base,
+  } as TextStyle,
   emptySubtext: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginTop: 8,
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textTertiary,
+    marginTop: theme.spacing.sm,
     textAlign: 'center',
-  },
+  } as TextStyle,
 });
 
 export default JournalScreen;

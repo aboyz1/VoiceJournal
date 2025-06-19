@@ -9,6 +9,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ViewStyle,
+  TextStyle,
 } from "react-native";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { createEntry, updateEntry, getEntry } from "../services/StorageService";
@@ -18,6 +20,7 @@ import { getMoodConfig } from "../utils/moodUtils";
 import { isValidText, validateJournalEntry } from "../utils/validationUtils";
 import { showErrorAlert, showSuccessAlert, showUnsavedChangesAlert } from "../utils/alertUtils";
 import { Mood } from "../data/schemas";
+import { theme } from "../theme/theme";
 
 type ReviewScreenRouteProp = RouteProp<RootStackParamList, "Review">;
 
@@ -37,7 +40,7 @@ const ReviewScreen = () => {
     mood: "neutral",
     confidence: 0,
     description: "Analyzing...",
-    color: "#6C757D",
+    color: theme.colors.textTertiary,
     icon: "help-circle"
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -50,7 +53,6 @@ const ReviewScreen = () => {
   const audioUri = route.params?.audioUri || '';
   const existingEntryId = route.params?.entryId;
 
-  // Convert mood analysis to UI data using utilities
   const getMoodData = (mood: Mood, confidence: number): MoodData => {
     const config = getMoodConfig(mood);
     return {
@@ -62,7 +64,6 @@ const ReviewScreen = () => {
     };
   };
 
-  // Load existing entry if editing
   useEffect(() => {
     const loadExistingEntry = async () => {
       if (existingEntryId) {
@@ -92,7 +93,6 @@ const ReviewScreen = () => {
     loadExistingEntry();
   }, [existingEntryId]);
 
-  // Analyze mood when text changes
   const analyzeMood = async (textToAnalyze: string) => {
     if (!isValidText(textToAnalyze)) return;
     
@@ -105,7 +105,6 @@ const ReviewScreen = () => {
     }
   };
 
-  // Handle text changes with debounced mood analysis
   const handleTextChange = (newText: string) => {
     setText(newText);
     
@@ -118,9 +117,7 @@ const ReviewScreen = () => {
     return () => clearTimeout(timeoutId);
   };
 
-  // Handle save functionality
   const handleSave = async () => {
-    // Validate entry data
     const validation = validateJournalEntry({
       text: text.trim(),
       audioUri,
@@ -163,7 +160,6 @@ const ReviewScreen = () => {
     }
   };
 
-  // Handle cancel editing
   const handleCancelEdit = () => {
     setText(originalText);
     setIsEditing(false);
@@ -172,7 +168,6 @@ const ReviewScreen = () => {
     }
   };
 
-  // Check if there are unsaved changes
   const hasUnsavedChanges = text.trim() !== originalText.trim();
 
   if (isLoading) {
@@ -188,7 +183,6 @@ const ReviewScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Header with back button and title */}
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
@@ -203,23 +197,21 @@ const ReviewScreen = () => {
               }
             }}
           >
-            <Ionicons name="chevron-back" size={24} color="#000" />
+            <Ionicons name="chevron-back" size={24} color={theme.colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.screenTitle}>Journal Entry</Text>
           <View style={{ width: 24 }} />
         </View>
 
-        {/* Date and time section */}
         <View style={styles.dateContainer}>
           <Text style={styles.dateText}>
             {formatDateTime(new Date())}
           </Text>
         </View>
 
-        {/* Audio player section */}
         <View style={styles.audioPlayer}>
           <TouchableOpacity style={styles.playButton}>
-            <Ionicons name="play" size={24} color="#fff" />
+            <Ionicons name="play" size={24} color={theme.colors.surface} />
           </TouchableOpacity>
           <View style={styles.progressBar}>
             <View style={styles.progressFill} />
@@ -227,17 +219,17 @@ const ReviewScreen = () => {
           <Text style={styles.durationText}>1:23</Text>
         </View>
 
-        {/* Transcription section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Transcription</Text>
           {isEditing ? (
             <TextInput
-              style={styles.textInput}
+              style={styles.textInput as TextStyle}
               multiline
               value={text}
               onChangeText={handleTextChange}
               autoFocus
               placeholder="Enter your journal entry..."
+              placeholderTextColor={theme.colors.textDisabled}
             />
           ) : (
             <View style={styles.transcriptionBox}>
@@ -248,12 +240,11 @@ const ReviewScreen = () => {
           )}
         </View>
 
-        {/* Mood analysis section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Mood Analysis</Text>
           <View style={styles.moodContainer}>
             <View style={[styles.moodPill, { backgroundColor: moodData.color }]}>
-              <Ionicons name={moodData.icon as any} size={16} color="#fff" />
+              <Ionicons name={moodData.icon as any} size={16} color={theme.colors.surface} />
               <Text style={styles.moodText}>{moodData.mood.toUpperCase()}</Text>
             </View>
             <Text style={styles.moodDescription}>
@@ -268,7 +259,6 @@ const ReviewScreen = () => {
         </View>
       </ScrollView>
 
-      {/* Footer with action buttons */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.secondaryButton}
@@ -284,7 +274,7 @@ const ReviewScreen = () => {
           <Ionicons
             name={isEditing ? "close" : "create"}
             size={20}
-            color="#007AFF"
+            color={theme.colors.secondary}
           />
           <Text style={styles.secondaryButtonText}>
             {isEditing ? "Cancel" : "Edit"}
@@ -299,7 +289,7 @@ const ReviewScreen = () => {
           <Ionicons
             name={isEditing ? "checkmark" : "save"}
             size={20}
-            color="#fff"
+            color={theme.colors.surface}
           />
           <Text style={styles.buttonText}>
             {isSaving ? "Saving..." : isEditing ? "Save Changes" : "Save Entry"}
@@ -309,154 +299,153 @@ const ReviewScreen = () => {
     </SafeAreaView>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
-  },
+    backgroundColor: theme.colors.background,
+  } as ViewStyle,
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
+  } as ViewStyle,
   loadingText: {
-    fontSize: 16,
-    color: "#6C757D",
-  },
+    fontSize: theme.typography.fontSize.md,
+    color: theme.colors.textTertiary,
+  } as TextStyle,
   scrollContainer: {
-    padding: 16,
+    padding: theme.spacing.base,
     paddingBottom: 80,
-  },
+  } as ViewStyle,
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 24,
-  },
+    marginBottom: theme.spacing.xl,
+  } as ViewStyle,
   backButton: {
-    padding: 8,
-  },
+    padding: theme.spacing.sm,
+  } as ViewStyle,
   screenTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#1A1A1A",
-  },
+    fontSize: theme.typography.fontSize.xl,
+    fontWeight: theme.typography.fontWeight.semibold,
+    color: theme.colors.textPrimary,
+  } as TextStyle,
   dateContainer: {
-    marginBottom: 20,
-  },
+    marginBottom: theme.spacing.lg,
+  } as ViewStyle,
   dateText: {
-    fontSize: 14,
-    color: "#6C757D",
-  },
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textTertiary,
+  } as TextStyle,
   audioPlayer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.base,
+    marginBottom: theme.spacing.xl,
+    shadowColor: theme.shadows.base.shadowColor,
+    shadowOffset: theme.shadows.base.shadowOffset,
+    shadowOpacity: theme.shadows.base.shadowOpacity,
+    shadowRadius: theme.shadows.base.shadowRadius,
+    elevation: theme.shadows.base.elevation,
+  } as ViewStyle,
   playButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: theme.colors.secondary,
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: theme.borderRadius.full,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 16,
-  },
+    marginRight: theme.spacing.base,
+  } as ViewStyle,
   progressBar: {
     flex: 1,
     height: 4,
-    backgroundColor: "#E9ECEF",
-    borderRadius: 2,
-    marginRight: 16,
-  },
+    backgroundColor: theme.colors.border,
+    borderRadius: theme.borderRadius.xs,
+    marginRight: theme.spacing.base,
+  } as ViewStyle,
   progressFill: {
     width: "60%",
     height: "100%",
-    backgroundColor: "#007AFF",
-    borderRadius: 2,
-  },
+    backgroundColor: theme.colors.secondary,
+    borderRadius: theme.borderRadius.xs,
+  } as ViewStyle,
   durationText: {
-    fontSize: 14,
-    color: "#6C757D",
-  },
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textTertiary,
+  } as TextStyle,
   section: {
-    marginBottom: 24,
-  },
+    marginBottom: theme.spacing.xl,
+  } as ViewStyle,
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1A1A1A",
-    marginBottom: 12,
-  },
+    fontSize: theme.typography.fontSize.md,
+    fontWeight: theme.typography.fontWeight.semibold,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.md,
+  } as TextStyle,
   transcriptionBox: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.base,
+    shadowColor: theme.shadows.base.shadowColor,
+    shadowOffset: theme.shadows.base.shadowOffset,
+    shadowOpacity: theme.shadows.base.shadowOpacity,
+    shadowRadius: theme.shadows.base.shadowRadius,
+    elevation: theme.shadows.base.elevation,
     minHeight: 100,
-  },
+  } as ViewStyle,
   transcriptionText: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: "#333333",
-  },
+    fontSize: theme.typography.fontSize.md,
+    lineHeight: theme.typography.fontSize.xl,
+    color: theme.colors.textSecondary,
+  } as TextStyle,
   textInput: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    lineHeight: 24,
-    color: "#333333",
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.base,
+    fontSize: theme.typography.fontSize.md,
+    lineHeight: theme.typography.fontSize.xl,
+    color: theme.colors.textSecondary,
     minHeight: 150,
     textAlignVertical: "top",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
+    shadowColor: theme.shadows.base.shadowColor,
+    shadowOffset: theme.shadows.base.shadowOffset,
+    shadowOpacity: theme.shadows.base.shadowOpacity,
+    shadowRadius: theme.shadows.base.shadowRadius,
+    elevation: theme.shadows.base.elevation,
+  } as ViewStyle,
   moodContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
-  },
+    marginBottom: theme.spacing.sm,
+  } as ViewStyle,
   moodPill: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 12,
-  },
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+    marginRight: theme.spacing.md,
+  } as ViewStyle,
   moodText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    fontSize: 12,
-    marginLeft: 6,
-  },
-  moodDescription: {
-    fontSize: 14,
-    color: "#6C757D",
-  },
+    color: theme.colors.surface,
+    fontWeight: theme.typography.fontWeight.semibold,
+    fontSize: theme.typography.fontSize.xs,
+    marginLeft: theme.spacing.xs,
+  } as TextStyle,
+    moodDescription: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textTertiary,
+  } as TextStyle,
   confidenceText: {
-    fontSize: 12,
-    color: "#6C757D",
+    fontSize: theme.typography.fontSize.xs,
+    color: theme.colors.textTertiary,
     fontStyle: "italic",
-    marginTop: 4,
-  },
+    marginTop: theme.spacing.xs,
+  } as TextStyle,
   footer: {
     position: "absolute",
     bottom: 0,
@@ -464,48 +453,48 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: "row",
     justifyContent: "space-between",
-    padding: 16,
-    backgroundColor: "#FFFFFF",
+    padding: theme.spacing.base,
+    backgroundColor: theme.colors.surface,
     borderTopWidth: 1,
-    borderTopColor: "#E9ECEF",
-  },
+    borderTopColor: theme.colors.border,
+  } as ViewStyle,
   primaryButton: {
     flex: 1,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#007AFF",
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginLeft: 8,
-  },
+    backgroundColor: theme.colors.secondary,
+    paddingVertical: theme.spacing.sm + 2,
+    borderRadius: theme.borderRadius.md,
+    marginLeft: theme.spacing.sm,
+  } as ViewStyle,
   secondaryButton: {
     flex: 1,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: theme.spacing.sm + 2,
+    borderRadius: theme.borderRadius.md,
     borderWidth: 1,
-    borderColor: "#007AFF",
-    marginRight: 8,
-  },
+    borderColor: theme.colors.secondary,
+    marginRight: theme.spacing.sm,
+  } as ViewStyle,
   disabledButton: {
-    backgroundColor: "#6C757D",
+    backgroundColor: theme.colors.processing,
     opacity: 0.6,
-  },
+  } as ViewStyle,
   buttonText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    fontSize: 16,
-    marginLeft: 8,
-  },
+    color: theme.colors.surface,
+    fontWeight: theme.typography.fontWeight.semibold,
+    fontSize: theme.typography.fontSize.md,
+    marginLeft: theme.spacing.sm,
+  } as TextStyle,
   secondaryButtonText: {
-    color: "#007AFF",
-    fontWeight: "600",
-    fontSize: 16,
-    marginLeft: 8,
-  },
+    color: theme.colors.secondary,
+    fontWeight: theme.typography.fontWeight.semibold,
+    fontSize: theme.typography.fontSize.md,
+    marginLeft: theme.spacing.sm,
+  } as TextStyle,
 });
 
 export default ReviewScreen;
