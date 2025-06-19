@@ -1,4 +1,7 @@
-import { Audio } from "expo-av";
+import { Audio } from 'expo-av';
+import { showErrorAlert } from '../utils/alertUtils';
+
+let recording: Audio.Recording | null = null;
 
 export const RECORDING_OPTIONS: Audio.RecordingOptions = {
   android: {
@@ -25,12 +28,13 @@ export const RECORDING_OPTIONS: Audio.RecordingOptions = {
   },
 };
 
-let recording: Audio.Recording | null = null;
-
 export async function startRecording(): Promise<Audio.Recording | null> {
   try {
     const { status } = await Audio.requestPermissionsAsync();
-    if (status !== "granted") return null;
+    if (status !== "granted") {
+      showErrorAlert('Permission Required', 'Microphone permission is required to record audio');
+      return null;
+    }
 
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: true,
@@ -41,21 +45,28 @@ export async function startRecording(): Promise<Audio.Recording | null> {
     await recording.prepareToRecordAsync(RECORDING_OPTIONS);
     await recording.startAsync();
     return recording;
-  } catch (e) {
-    console.error("Failed to start recording", e);
+  } catch (error) {
+    console.error("Failed to start recording", error);
+    showErrorAlert('Recording Error', 'Failed to start recording. Please try again.');
     return null;
   }
 }
 
 export const stopRecording = async (): Promise<string | null> => {
   if (!recording) return null;
+  
   try {
     await recording.stopAndUnloadAsync();
     const uri = recording.getURI();
     recording = null;
     return uri;
-  } catch (err) {
-    console.error("Stop recording error:", err);
+  } catch (error) {
+    console.error("Stop recording error:", error);
+    showErrorAlert('Recording Error', 'Failed to stop recording. Please try again.');
     return null;
   }
+};
+
+export const isRecording = (): boolean => {
+  return recording !== null;
 };

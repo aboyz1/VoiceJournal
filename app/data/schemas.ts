@@ -10,12 +10,15 @@ export const JOURNAL_COLUMNS = {
   UPDATED_AT: 'updated_at'
 };
 
+// Mood types
+export type Mood = 'happy' | 'sad' | 'angry' | 'neutral' | 'excited' | 'calm';
+
 // Journal entry interface
 export interface JournalEntry {
   id: string;
   audioUri: string;
   text: string;
-  mood: string;
+  mood: Mood;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -44,7 +47,7 @@ export const CREATE_DATE_INDEX = `
 
 // NLP Analysis interface
 export interface NLPAnalysis {
-  mood: string;
+  mood: Mood;
   confidence: number;
   keywords: string[];
   summary: string;

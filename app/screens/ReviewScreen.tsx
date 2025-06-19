@@ -9,16 +9,20 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Alert,
 } from "react-native";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { createEntry, updateEntry, getEntry } from "../services/StorageService";
 import { analyzeText } from "../services/NLPService";
+import { formatDateTime } from "../utils/dateUtils";
+import { getMoodConfig } from "../utils/moodUtils";
+import { isValidText, validateJournalEntry } from "../utils/validationUtils";
+import { showErrorAlert, showSuccessAlert, showUnsavedChangesAlert } from "../utils/alertUtils";
+import { Mood } from "../data/schemas";
 
 type ReviewScreenRouteProp = RouteProp<RootStackParamList, "Review">;
 
 interface MoodData {
-  mood: string;
+  mood: Mood;
   confidence: number;
   description: string;
   color: string;
@@ -43,54 +47,18 @@ const ReviewScreen = () => {
   const route = useRoute<ReviewScreenRouteProp>();
   const navigation = useNavigation();
   
-  // Add safety check for route params
   const audioUri = route.params?.audioUri || '';
   const existingEntryId = route.params?.entryId;
 
-  // Map mood to UI properties
-  const getMoodData = (mood: string, confidence: number): MoodData => {
-    const moodMap: Record<string, Omit<MoodData, 'confidence'>> = {
-      happy: {
-        mood: "happy",
-        description: "Positive sentiment detected",
-        color: "#FFD700",
-        icon: "happy"
-      },
-      sad: {
-        mood: "sad", 
-        description: "Negative sentiment detected",
-        color: "#FF6B6B",
-        icon: "sad"
-      },
-      angry: {
-        mood: "angry",
-        description: "Frustrated sentiment detected", 
-        color: "#FF4757",
-        icon: "flame"
-      },
-      anxious: {
-        mood: "anxious",
-        description: "Worried sentiment detected",
-        color: "#FFA502", 
-        icon: "alert-circle"
-      },
-      calm: {
-        mood: "calm",
-        description: "Peaceful sentiment detected",
-        color: "#70A1FF",
-        icon: "leaf"
-      },
-      neutral: {
-        mood: "neutral",
-        description: "Neutral sentiment detected",
-        color: "#6C757D",
-        icon: "remove-circle"
-      }
-    };
-
+  // Convert mood analysis to UI data using utilities
+  const getMoodData = (mood: Mood, confidence: number): MoodData => {
+    const config = getMoodConfig(mood);
     return {
-      ...moodMap[mood] || moodMap.neutral,
-      confidence
+      mood,
+      confidence,
+      description: config.description,
+      color: config.color,
+      icon: config.icon
     };
   };
 
@@ -105,16 +73,15 @@ const ReviewScreen = () => {
             setText(entry.text);
             setOriginalText(entry.text);
             setEntryId(entry.id);
-            setMoodData(getMoodData(entry.mood, 0.95)); // Assume high confidence for existing
+            setMoodData(getMoodData(entry.mood, 0.95));
           }
         } catch (error) {
           console.error('Error loading entry:', error);
-          Alert.alert('Error', 'Failed to load journal entry');
+          showErrorAlert('Error', 'Failed to load journal entry');
         } finally {
           setIsLoading(false);
         }
       } else {
-        // New entry - set demo text and analyze
         const demoText = "This is a demo transcription of your audio entry.";
         setText(demoText);
         setOriginalText(demoText);
@@ -127,7 +94,7 @@ const ReviewScreen = () => {
 
   // Analyze mood when text changes
   const analyzeMood = async (textToAnalyze: string) => {
-    if (!textToAnalyze.trim()) return;
+    if (!isValidText(textToAnalyze)) return;
     
     try {
       const analysis = await analyzeText(textToAnalyze);
@@ -142,7 +109,6 @@ const ReviewScreen = () => {
   const handleTextChange = (newText: string) => {
     setText(newText);
     
-    // Debounce mood analysis
     const timeoutId = setTimeout(() => {
       if (newText !== originalText) {
         analyzeMood(newText);
@@ -154,8 +120,15 @@ const ReviewScreen = () => {
 
   // Handle save functionality
   const handleSave = async () => {
-    if (!text.trim()) {
-      Alert.alert('Error', 'Please add some text before saving');
+    // Validate entry data
+    const validation = validateJournalEntry({
+      text: text.trim(),
+      audioUri,
+      mood: moodData.mood
+    });
+
+    if (!validation.isValid) {
+      showErrorAlert('Validation Error', validation.errors.join('\n'));
       return;
     }
 
@@ -163,21 +136,19 @@ const ReviewScreen = () => {
     
     try {
       if (entryId) {
-        // Update existing entry
         await updateEntry(entryId, {
           text: text.trim(),
           mood: moodData.mood
         });
-        Alert.alert('Success', 'Journal entry updated successfully');
+        showSuccessAlert('Success', 'Journal entry updated successfully');
       } else {
-        // Create new entry
         const newEntryId = await createEntry({
           audioUri,
           text: text.trim(),
           mood: moodData.mood
         });
         setEntryId(newEntryId);
-        Alert.alert('Success', 'Journal entry saved successfully');
+        showSuccessAlert('Success', 'Journal entry saved successfully');
       }
       
       setOriginalText(text);
@@ -186,7 +157,7 @@ const ReviewScreen = () => {
       }
     } catch (error) {
       console.error('Save error:', error);
-      Alert.alert('Error', 'Failed to save journal entry. Please try again.');
+      showErrorAlert('Error', 'Failed to save journal entry. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -196,7 +167,6 @@ const ReviewScreen = () => {
   const handleCancelEdit = () => {
     setText(originalText);
     setIsEditing(false);
-    // Restore original mood analysis
     if (originalText !== text) {
       analyzeMood(originalText);
     }
@@ -204,14 +174,6 @@ const ReviewScreen = () => {
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = text.trim() !== originalText.trim();
-
-  // Format date
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString() + ' • ' + date.toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
 
   if (isLoading) {
     return (
@@ -232,14 +194,9 @@ const ReviewScreen = () => {
             style={styles.backButton}
             onPress={() => {
               if (hasUnsavedChanges && !isEditing) {
-                Alert.alert(
-                  'Unsaved Changes',
-                  'You have unsaved changes. Do you want to save before leaving?',
-                  [
-                    { text: 'Discard', onPress: () => navigation.goBack() },
-                    { text: 'Save', onPress: handleSave },
-                    { text: 'Cancel', style: 'cancel' }
-                  ]
+                showUnsavedChangesAlert(
+                  handleSave,
+                  () => navigation.goBack()
                 );
               } else {
                 navigation.goBack();
@@ -255,7 +212,7 @@ const ReviewScreen = () => {
         {/* Date and time section */}
         <View style={styles.dateContainer}>
           <Text style={styles.dateText}>
-            {formatDate(new Date())}
+            {formatDateTime(new Date())}
           </Text>
         </View>
 
@@ -335,7 +292,7 @@ const ReviewScreen = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.primaryButton, isSaving && { opacity: 0.5 }]}
+          style={[styles.primaryButton, isSaving && styles.disabledButton]}
           onPress={handleSave}
           disabled={isSaving}
         >
@@ -353,7 +310,8 @@ const ReviewScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({  container: {
+const styles = StyleSheet.create({
+  container: {
     flex: 1,
     backgroundColor: "#F8F9FA",
   },

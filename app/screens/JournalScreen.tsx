@@ -1,30 +1,43 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, SafeAreaView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import EntryCard from '../components/EntryCard';
 import { getAllEntries } from '../services/StorageService';
+import { initDatabase } from '../data/Database';
 import { JournalEntry } from '../data/schemas';
+import { RootStackParamList } from '../navigation/AppNavigator';
+import { showErrorAlert } from '../utils/alertUtils';
 
+type JournalScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
-const JournalScreen = ({ navigation }: { navigation: any }) => {
+const JournalScreen = () => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigation = useNavigation<JournalScreenNavigationProp>();
 
   useEffect(() => {
-    const loadEntries = async () => {
+    const initializeAndLoadEntries = async () => {
       try {
+        // Initialize database first
+        await initDatabase();
+        
+        // Then load entries
         const loadedEntries = await getAllEntries();
         setEntries(loadedEntries);
       } catch (err) {
-        setError('Failed to load journal entries');
+        const errorMessage = 'Failed to load journal entries';
+        setError(errorMessage);
+        showErrorAlert('Error', errorMessage);
         console.error(err);
       } finally {
         setLoading(false);
       }
     };
 
-    loadEntries();
+    initializeAndLoadEntries();
   }, []);
 
   const handleRefresh = async () => {
@@ -32,8 +45,11 @@ const JournalScreen = ({ navigation }: { navigation: any }) => {
     try {
       const loadedEntries = await getAllEntries();
       setEntries(loadedEntries);
+      setError(null);
     } catch (err) {
-      setError('Failed to refresh entries');
+      const errorMessage = 'Failed to refresh entries';
+      setError(errorMessage);
+      showErrorAlert('Error', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -47,11 +63,12 @@ const JournalScreen = ({ navigation }: { navigation: any }) => {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading entries...</Text>
       </SafeAreaView>
     );
   }
 
-  if (error) {
+  if (error && entries.length === 0) {
     return (
       <SafeAreaView style={styles.errorContainer}>
         <Ionicons name="warning" size={48} color="#FF3B30" />
@@ -70,8 +87,12 @@ const JournalScreen = ({ navigation }: { navigation: any }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Journal Entries</Text>
-        <TouchableOpacity onPress={handleRefresh}>
-          <Ionicons name="refresh" size={24} color="#007AFF" />
+        <TouchableOpacity onPress={handleRefresh} disabled={loading}>
+          <Ionicons 
+            name="refresh" 
+            size={24} 
+            color={loading ? "#8E8E93" : "#007AFF"} 
+          />
         </TouchableOpacity>
       </View>
 
@@ -94,6 +115,7 @@ const JournalScreen = ({ navigation }: { navigation: any }) => {
           contentContainerStyle={styles.listContent}
           refreshing={loading}
           onRefresh={handleRefresh}
+          showsVerticalScrollIndicator={false}
         />
       )}
     </SafeAreaView>
@@ -110,6 +132,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#8E8E93',
+    marginTop: 12,
   },
   errorContainer: {
     flex: 1,

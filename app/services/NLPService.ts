@@ -1,12 +1,5 @@
-export type Mood = "happy" | "sad" | "angry" | "neutral" | "excited" | "calm";
-
-type NLPAnalysis = {
-  mood: Mood;
-  confidence: number;
-  keywords: string[];
-  summary?: string;
-  sentimentScore: number;
-};
+import { NLPAnalysis, Mood } from '../data/schemas';
+import { mapSentimentToMood } from '../utils/moodUtils';
 
 export const analyzeText = async (text: string): Promise<NLPAnalysis> => {
   // Demo/mock response for development
@@ -46,13 +39,4 @@ export const analyzeText = async (text: string): Promise<NLPAnalysis> => {
     throw new Error('Analysis failed. Please try again.');
   }
   */
-};
-
-// Helper function to convert sentiment score to mood categories
-const mapSentimentToMood = (score: number): Mood => {
-  if (score > 0.6) return "excited";
-  if (score > 0.3) return "happy";
-  if (score > -0.3) return "neutral";
-  if (score > -0.6) return "sad";
-  return "angry";
 };

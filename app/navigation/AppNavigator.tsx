@@ -10,13 +10,16 @@ import React from "react";
 import HomeScreen from "../screens/HomeScreen";
 import JournalScreen from "../screens/JournalScreen";
 import ReviewScreen from "../screens/ReviewScreen";
+import EntryDetailScreen from "../screens/EntryDetailScreen";
 
-// Use unique names for tab and stack screens
+// Updated RootStackParamList with unique screen names
 export type RootStackParamList = {
   Home: undefined; // Tab name
-  Journal: undefined;
+  Journal: undefined; // Tab name
   HomeScreen: undefined; // Stack screen name
+  JournalScreen: undefined; // Stack screen name (renamed from Journal)
   Review: { audioUri: string; entryId?: string };
+  EntryDetail: { entryId: string };
 };
 
 const Tab = createBottomTabNavigator<RootStackParamList>();
@@ -26,6 +29,15 @@ const HomeStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="HomeScreen" component={HomeScreen} />
     <Stack.Screen name="Review" component={ReviewScreen} />
+    <Stack.Screen name="EntryDetail" component={EntryDetailScreen} />
+  </Stack.Navigator>
+);
+
+// Create a Journal Stack to handle EntryDetail navigation from Journal tab
+const JournalStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="JournalScreen" component={JournalScreen} />
+    <Stack.Screen name="EntryDetail" component={EntryDetailScreen} />
   </Stack.Navigator>
 );
 
@@ -34,7 +46,7 @@ const getTabBarVisibility = (
   route: RouteProp<RootStackParamList, keyof RootStackParamList> | any
 ) => {
   const routeName = getFocusedRouteNameFromRoute(route) ?? "HomeScreen";
-  if (routeName === "Review") {
+  if (routeName === "Review" || routeName === "EntryDetail") {
     return "none";
   }
   return "flex";
@@ -63,7 +75,7 @@ const AppNavigator = () => {
       })}
     >
       <Tab.Screen name="Home" component={HomeStack} />
-      <Tab.Screen name="Journal" component={JournalScreen} />
+      <Tab.Screen name="Journal" component={JournalStack} />
     </Tab.Navigator>
   );
 };

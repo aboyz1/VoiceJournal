@@ -1,12 +1,13 @@
 import { executeQuery, executeSql } from "../data/Database";
 import { JOURNAL_COLUMNS, JOURNAL_TABLE, JournalEntry } from "../data/schemas";
+import { generateId, getCurrentTimestamp, timestampToDate } from "../utils/storageUtils";
 
 // Create a new journal entry
 export const createEntry = async (
   entry: Omit<JournalEntry, "id" | "createdAt" | "updatedAt">
 ): Promise<string> => {
-  const id = Date.now().toString();
-  const now = new Date().getTime();
+  const id = generateId();
+  const now = getCurrentTimestamp();
 
   const sql = `
     INSERT INTO ${JOURNAL_TABLE} (
@@ -41,8 +42,8 @@ export const getAllEntries = async (): Promise<JournalEntry[]> => {
       audioUri: item[JOURNAL_COLUMNS.AUDIO_URI],
       text: item[JOURNAL_COLUMNS.TEXT],
       mood: item[JOURNAL_COLUMNS.MOOD],
-      createdAt: new Date(item[JOURNAL_COLUMNS.CREATED_AT]),
-      updatedAt: new Date(item[JOURNAL_COLUMNS.UPDATED_AT]),
+      createdAt: timestampToDate(item[JOURNAL_COLUMNS.CREATED_AT]),
+      updatedAt: timestampToDate(item[JOURNAL_COLUMNS.UPDATED_AT]),
     });
   }
 
@@ -68,8 +69,8 @@ export const getEntry = async (id: string): Promise<JournalEntry | null> => {
     audioUri: item[JOURNAL_COLUMNS.AUDIO_URI],
     text: item[JOURNAL_COLUMNS.TEXT],
     mood: item[JOURNAL_COLUMNS.MOOD],
-    createdAt: new Date(item[JOURNAL_COLUMNS.CREATED_AT]),
-    updatedAt: new Date(item[JOURNAL_COLUMNS.UPDATED_AT]),
+    createdAt: timestampToDate(item[JOURNAL_COLUMNS.CREATED_AT]),
+    updatedAt: timestampToDate(item[JOURNAL_COLUMNS.UPDATED_AT]),
   };
 };
 
@@ -78,7 +79,7 @@ export const updateEntry = async (
   id: string,
   updates: Partial<JournalEntry>
 ): Promise<void> => {
-  const now = new Date().getTime();
+  const now = getCurrentTimestamp();
 
   const sql = `
     UPDATE ${JOURNAL_TABLE}
@@ -121,8 +122,8 @@ export const searchEntries = async (query: string): Promise<JournalEntry[]> => {
       audioUri: item[JOURNAL_COLUMNS.AUDIO_URI],
       text: item[JOURNAL_COLUMNS.TEXT],
       mood: item[JOURNAL_COLUMNS.MOOD],
-      createdAt: new Date(item[JOURNAL_COLUMNS.CREATED_AT]),
-      updatedAt: new Date(item[JOURNAL_COLUMNS.UPDATED_AT]),
+      createdAt: timestampToDate(item[JOURNAL_COLUMNS.CREATED_AT]),
+      updatedAt: timestampToDate(item[JOURNAL_COLUMNS.UPDATED_AT]),
     });
   }
 
