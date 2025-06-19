@@ -1,72 +1,57 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { JournalEntry } from '../data/schemas';
+import { formatDateTime, getRelativeTime } from '../utils/dateUtils';
+import { getMoodConfig } from '../utils/moodUtils';
 
-type EntryCardProps = {
+interface EntryCardProps {
   entry: JournalEntry;
   onPress: () => void;
-};
-
-const moodIcons = {
-  happy: 'happy',
-  sad: 'sad',
-  angry: 'flame',
-  neutral: 'remove',
-  excited: 'flash',
-  calm: 'moon',
-};
-
-const moodColors = {
-  happy: '#34C759',
-  sad: '#0A84FF',
-  angry: '#FF3B30',
-  neutral: '#8E8E93',
-  excited: '#FFCC00',
-  calm: '#5856D6',
-};
+}
 
 const EntryCard: React.FC<EntryCardProps> = ({ entry, onPress }) => {
-  const formattedDate = entry.createdAt.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-
-  const time = entry.createdAt.toLocaleTimeString([], { 
-    hour: '2-digit', 
-    minute: '2-digit' 
-  });
-
-  const snippet = entry.text.length > 100 
-    ? `${entry.text.substring(0, 100)}...` 
+  const moodConfig = getMoodConfig(entry.mood);
+  
+  // Truncate text for preview
+  const previewText = entry.text.length > 100 
+    ? entry.text.substring(0, 100) + '...' 
     : entry.text;
 
   return (
-    <TouchableOpacity onPress={onPress} style={styles.container}>
+    <TouchableOpacity style={styles.card} onPress={onPress}>
       <View style={styles.header}>
-        <Text style={styles.dateText}>{formattedDate} • {time}</Text>
-        <View style={[styles.moodContainer, { backgroundColor: moodColors[entry.mood as keyof typeof moodColors] }]}>
+        <Text style={styles.dateText}>
+          {getRelativeTime(entry.createdAt)}
+        </Text>
+        <View style={[styles.moodBadge, { backgroundColor: moodConfig.color }]}>
           <Ionicons 
-            name={moodIcons[entry.mood as keyof typeof moodIcons] as any} 
-            size={14} 
+            name={moodConfig.icon as any} 
+            size={12} 
             color="white" 
           />
-          <Text style={styles.moodText}>{entry.mood.toUpperCase()}</Text>
+          <Text style={styles.moodText}>
+            {moodConfig.displayName.toUpperCase()}
+          </Text>
         </View>
       </View>
       
-      <Text style={styles.snippetText}>{snippet}</Text>
+      <Text style={styles.previewText} numberOfLines={3}>
+        {previewText}
+      </Text>
       
       <View style={styles.footer}>
-        <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+        <Text style={styles.fullDateText}>
+          {formatDateTime(entry.createdAt)}
+        </Text>
+        <Ionicons name="chevron-forward" size={16} color="#8E8E93" />
       </View>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
@@ -85,29 +70,36 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 14,
-    color: '#8E8E93',
+    fontWeight: '600',
+    color: '#1C1C1E',
   },
-  moodContainer: {
+  moodBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 20,
+    borderRadius: 12,
   },
   moodText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
     marginLeft: 4,
   },
-  snippetText: {
-    fontSize: 16,
-    color: '#1C1C1E',
-    lineHeight: 22,
-    marginBottom: 8,
+  previewText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#3C3C43',
+    marginBottom: 12,
   },
   footer: {
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  fullDateText: {
+    fontSize: 12,
+    color: '#8E8E93',
   },
 });
 
