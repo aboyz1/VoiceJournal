@@ -9,17 +9,23 @@ export default function App() {
   const [dbError, setDbError] = useState<string | null>(null);
 
   useEffect(() => {
-    const setupDatabase = async () => {
+
+    const initApp = async () => {
       try {
+        console.log('[App] Initializing database...');
         await initDatabase();
+        console.log('[App] Database initialized successfully');
         setIsDbReady(true);
       } catch (error) {
-        console.error('Database setup failed:', error);
+
+        console.error('[App] Failed to initialize database:', error);
         setDbError('Failed to initialize database');
       }
     };
 
-    setupDatabase();
+
+    
+    initApp();
   }, []);
 
   if (dbError) {

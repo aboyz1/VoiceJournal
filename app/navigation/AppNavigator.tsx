@@ -7,40 +7,41 @@ import {
 import { createStackNavigator } from "@react-navigation/stack";
 import React from "react";
 
+import EntryDetailScreen from "../screens/EntryDetailScreen";
 import HomeScreen from "../screens/HomeScreen";
 import JournalScreen from "../screens/JournalScreen";
 import ReviewScreen from "../screens/ReviewScreen";
-import EntryDetailScreen from "../screens/EntryDetailScreen";
 
-// Updated RootStackParamList with unique screen names
+// Update the RootStackParamList to include transcription parameter
 export type RootStackParamList = {
-  Home: undefined; // Tab name
-  Journal: undefined; // Tab name
-  HomeScreen: undefined; // Stack screen name
-  JournalScreen: undefined; // Stack screen name (renamed from Journal)
-  Review: { audioUri: string; entryId?: string };
+  Home: undefined;
+  Review: {
+    audioUri?: string;
+    entryId?: string;
+    transcription?: string;
+    duration?: number;
+  };
+  Journal: undefined;
   EntryDetail: { entryId: string };
 };
 
 const Tab = createBottomTabNavigator<RootStackParamList>();
-const Stack = createStackNavigator<RootStackParamList>();
+const Stack = createStackNavigator();
 
 const HomeStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
-    <Stack.Screen name="HomeScreen" component={HomeScreen} />
+    <Stack.Screen name="Home" component={HomeScreen} />
     <Stack.Screen name="Review" component={ReviewScreen} />
     <Stack.Screen name="EntryDetail" component={EntryDetailScreen} />
   </Stack.Navigator>
 );
-
 // Create a Journal Stack to handle EntryDetail navigation from Journal tab
 const JournalStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
-    <Stack.Screen name="JournalScreen" component={JournalScreen} />
+    <Stack.Screen name="Journal" component={JournalScreen} />
     <Stack.Screen name="EntryDetail" component={EntryDetailScreen} />
   </Stack.Navigator>
 );
-
 // Helper function to control tab bar visibility
 const getTabBarVisibility = (
   route: RouteProp<RootStackParamList, keyof RootStackParamList> | any
