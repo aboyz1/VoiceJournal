@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { Mood } from "../data/schemas";
 import {
   analyzeTextPatterns,
@@ -10,7 +11,7 @@ import {
 
 import { generateUniqueInsights } from "./InsightGenerationService";
 
-const HF_TOKEN = "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";
+const HF_TOKEN = process.env.HF_TOKEN;
 
 export interface MoodAnalysis {
   mood: Mood;
@@ -212,11 +213,11 @@ export const analyzeEmotionsComprehensively = async (
   text: string
 ): Promise<ComprehensiveMoodAnalysis> => {
   try {
-    console.log('[NLP] Starting comprehensive analysis for:', text);
-    
+    console.log("[NLP] Starting comprehensive analysis for:", text);
+
     // Build comprehensive context
     const context = await buildTextAnalysisContext(text);
-    
+
     // Get emotions analysis
     let allEmotions: MoodAnalysis[] = [];
     context.sentenceEmotions.forEach((sentenceData) => {
