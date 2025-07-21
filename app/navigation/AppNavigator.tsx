@@ -11,6 +11,7 @@ import EntryDetailScreen from "../screens/EntryDetailScreen";
 import HomeScreen from "../screens/HomeScreen";
 import JournalScreen from "../screens/JournalScreen";
 import ReviewScreen from "../screens/ReviewScreen";
+import TrendsScreen from "../screens/TrendsScreen";
 
 // Update the RootStackParamList to include transcription parameter
 export type RootStackParamList = {
@@ -22,6 +23,7 @@ export type RootStackParamList = {
     duration?: number;
   };
   Journal: undefined;
+  Trends: undefined;
   EntryDetail: { entryId: string };
 };
 
@@ -40,6 +42,12 @@ const JournalStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="Journal" component={JournalScreen} />
     <Stack.Screen name="EntryDetail" component={EntryDetailScreen} />
+  </Stack.Navigator>
+);
+// Create a Trends Stack (in case you need navigation from Trends later)
+const TrendsStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Trends" component={TrendsScreen} />
   </Stack.Navigator>
 );
 // Helper function to control tab bar visibility
@@ -63,11 +71,12 @@ const AppNavigator = () => {
 
           if (route.name === "Home") iconName = "home";
           else if (route.name === "Journal") iconName = "book";
+          else if (route.name === "Trends") iconName = "trending-up";
           else iconName = "document-text";
 
           return <Ionicons name={iconName as any} size={size} color={color} />;
         },
-        tabBarActiveTintColor: "#ff4757",
+        tabBarActiveTintColor: "#4111c7da",
         tabBarInactiveTintColor: "gray",
         headerShown: false,
         tabBarStyle: {
@@ -77,6 +86,7 @@ const AppNavigator = () => {
     >
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Journal" component={JournalStack} />
+      <Tab.Screen name="Trends" component={TrendsStack} />
     </Tab.Navigator>
   );
 };
