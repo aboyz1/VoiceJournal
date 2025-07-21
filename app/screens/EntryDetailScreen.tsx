@@ -37,9 +37,12 @@ const EntryDetailScreen = () => {
   useEffect(() => {
     const loadEntry = async () => {
       try {
+        console.log("[EntryDetailScreen] Loading entry with ID:", entryId);
         const loadedEntry = await getEntry(entryId);
+        console.log("[EntryDetailScreen] Entry loaded:", loadedEntry);
         setEntry(loadedEntry);
       } catch (err) {
+        console.error("[EntryDetailScreen] Error loading entry:", err);
         setError("Failed to load journal entry");
         showErrorAlert("Error", "Failed to load journal entry");
       } finally {
@@ -60,6 +63,7 @@ const EntryDetailScreen = () => {
     if (entry?.audioUri) {
       const loadAudio = async () => {
         try {
+          console.log("[EntryDetailScreen] Loading audio:", entry.audioUri);
           const { sound: audioSound } = await Audio.Sound.createAsync(
             { uri: entry.audioUri },
             { shouldPlay: false }

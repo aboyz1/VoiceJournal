@@ -4,8 +4,7 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
-  Easing,
+  Dimensions,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -14,19 +13,18 @@ import {
   TouchableOpacity,
   View,
   ViewStyle,
-  Dimensions,
 } from "react-native";
+import { JournalEntry } from "../data/schemas";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { startRecording, stopRecording } from "../services/AudioService";
 import { transcribeAudio } from "../services/STTService";
 import { getAllEntries } from "../services/StorageService";
-import { JournalEntry } from "../data/schemas";
-import { formatDateTime, getRelativeTime } from "../utils/dateUtils";
+import { getRelativeTime } from "../utils/dateUtils";
 import { getMoodConfig } from "../utils/moodUtils";
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 const HomeScreen = () => {
   const [isRecording, setIsRecording] = useState(false);
@@ -35,7 +33,7 @@ const HomeScreen = () => {
     "idle" | "recording" | "processing"
   >("idle");
   const [recentEntries, setRecentEntries] = useState<JournalEntry[]>([]);
-  
+
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -43,12 +41,21 @@ const HomeScreen = () => {
     loadRecentEntries();
   }, []);
 
+  // Add focus listener to reload entries when returning to home screen
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", () => {
+      loadRecentEntries();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
   const loadRecentEntries = async () => {
     try {
       const entries = await getAllEntries();
       setRecentEntries(entries.slice(0, 5)); // Get 5 most recent entries
     } catch (error) {
-      console.error('Error loading recent entries:', error);
+      console.error("Error loading recent entries:", error);
     }
   };
 
@@ -60,10 +67,15 @@ const HomeScreen = () => {
     }, 1000) as unknown as NodeJS.Timeout;
   };
 
-  const transcribeWithTimeout = async (audioUri: string, timeoutMs: number = 30000): Promise<string> => {
+  const transcribeWithTimeout = async (
+    audioUri: string,
+    timeoutMs: number = 30000
+  ): Promise<string> => {
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
-        reject(new Error('Transcription timeout - service took too long to respond'));
+        reject(
+          new Error("Transcription timeout - service took too long to respond")
+        );
       }, timeoutMs);
 
       transcribeAudio(audioUri)
@@ -79,55 +91,66 @@ const HomeScreen = () => {
   };
 
   const stopRecordingSession = async () => {
-    console.log('[HomeScreen] Stopping recording session...');
-    setRecordingState('processing');
-    
+    console.log("[HomeScreen] Stopping recording session...");
+    setRecordingState("processing");
+
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    
+
     try {
-      console.log('[HomeScreen] Getting audio URI...');
+      console.log("[HomeScreen] Getting audio URI...");
       const uri = await stopRecording();
-      console.log('[HomeScreen] Audio URI received:', uri);
-      
+      console.log("[HomeScreen] Audio URI received:", uri);
+
       if (uri) {
         try {
-          console.log('[HomeScreen] Starting transcription...');
+          console.log("[HomeScreen] Starting transcription...");
           const transcription = await transcribeWithTimeout(uri, 30000);
-          
-          console.log('[HomeScreen] Transcription completed, navigating to Review...');
-          navigation.navigate('Review', { 
+
+          console.log(
+            "[HomeScreen] Transcription completed, navigating to Review..."
+          );
+          navigation.navigate("Review", {
             audioUri: uri,
             transcription: transcription,
-            duration: recordingTime
+            duration: recordingTime,
           });
         } catch (transcriptionError) {
-          console.error('[HomeScreen] Transcription error:', transcriptionError);
-          
-          const errorMessage = transcriptionError instanceof Error 
-            ? transcriptionError.message 
-            : 'Unknown transcription error';
-            
-          console.log('[HomeScreen] Navigating to Review with error message...');
-          navigation.navigate('Review', { 
+          console.error(
+            "[HomeScreen] Transcription error:",
+            transcriptionError
+          );
+
+          const errorMessage =
+            transcriptionError instanceof Error
+              ? transcriptionError.message
+              : "Unknown transcription error";
+
+          console.log(
+            "[HomeScreen] Navigating to Review with error message..."
+          );
+          navigation.navigate("Review", {
             audioUri: uri,
             transcription: `Transcription failed: ${errorMessage}. Please edit manually.`,
-            duration: recordingTime
+            duration: recordingTime,
           });
         }
       } else {
-        console.error('[HomeScreen] No audio URI received');
-        throw new Error('No audio file was created');
+        console.error("[HomeScreen] No audio URI received");
+        throw new Error("No audio file was created");
       }
     } catch (error) {
-      console.error('[HomeScreen] Recording stop error:', error);
-      alert('Recording Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      console.error("[HomeScreen] Recording stop error:", error);
+      alert(
+        "Recording Error: " +
+          (error instanceof Error ? error.message : "Unknown error")
+      );
     } finally {
-      console.log('[HomeScreen] Resetting recording state...');
+      console.log("[HomeScreen] Resetting recording state...");
       setRecordingTime(0);
-      setRecordingState('idle');
+      setRecordingState("idle");
       setIsRecording(false);
     }
   };
@@ -151,21 +174,31 @@ const HomeScreen = () => {
       .padStart(2, "0")}`;
   };
 
+  const handleEntryPress = (entry: JournalEntry) => {
+    console.log("[HomeScreen] Entry pressed:", entry.id);
+    navigation.navigate("EntryDetail", { entryId: entry.id });
+  };
+
   const renderEntryCard = (entry: JournalEntry, index: number) => {
     const moodConfig = getMoodConfig(entry.mood);
-    
+
     return (
-      <TouchableOpacity 
-        key={entry.id} 
+      <TouchableOpacity
+        key={entry.id}
         style={styles.entryCard}
-        onPress={() => navigation.navigate('Review', { entryId: entry.id })}
+        onPress={() => handleEntryPress(entry)}
+        activeOpacity={0.7}
       >
-        <View style={[styles.entryThumbnail, { backgroundColor: moodConfig.color }]}>
+        <View
+          style={[styles.entryThumbnail, { backgroundColor: moodConfig.color }]}
+        >
           <Ionicons name={moodConfig.icon as any} size={24} color="#ffffff" />
         </View>
         <View style={styles.entryInfo}>
           <Text style={styles.entryTitle} numberOfLines={1}>
-            {entry.text.length > 20 ? entry.text.substring(0, 20) + '...' : entry.text}
+            {entry.text.length > 20
+              ? entry.text.substring(0, 20) + "..."
+              : entry.text}
           </Text>
           <Text style={styles.entryTime}>
             {getRelativeTime(entry.createdAt)}
@@ -179,7 +212,7 @@ const HomeScreen = () => {
     // Mock data for demonstration
     const moodPercentage = 75;
     const trendChange = "+10%";
-    
+
     return (
       <View style={styles.moodTrendCard}>
         <Text style={styles.cardTitle}>Mood Trend</Text>
@@ -188,7 +221,7 @@ const HomeScreen = () => {
           <Text style={styles.trendPeriod}>Last 7 Days</Text>
           <Text style={styles.trendChange}>{trendChange}</Text>
         </View>
-        
+
         {/* Simple mock chart - replace with actual chart library */}
         <View style={styles.chartContainer}>
           <View style={styles.chartPlaceholder}>
@@ -196,8 +229,10 @@ const HomeScreen = () => {
             <Text style={styles.chartSubtext}>Chart visualization here</Text>
           </View>
           <View style={styles.chartLabels}>
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-              <Text key={day} style={styles.dayLabel}>{day}</Text>
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+              <Text key={day} style={styles.dayLabel}>
+                {day}
+              </Text>
             ))}
           </View>
         </View>
@@ -211,7 +246,8 @@ const HomeScreen = () => {
         <View style={styles.insightContent}>
           <Text style={styles.insightTitle}>Positive Shift</Text>
           <Text style={styles.insightText}>
-            Your mood has shown a positive shift over the past week. Keep up the great work!
+            Your mood has shown a positive shift over the past week. Keep up the
+            great work!
           </Text>
         </View>
         <View style={styles.insightImage}>
@@ -231,11 +267,14 @@ const HomeScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Recent Entries Section */}
         <Text style={styles.sectionTitle}>Recent Entries</Text>
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.entriesScroll}
           contentContainerStyle={styles.entriesContainer}
