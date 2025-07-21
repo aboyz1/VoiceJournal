@@ -2,8 +2,7 @@
  * Advanced AI-powered insight generation service with robust fallbacks
  */
 
-import "dotenv/config";
-const HF_TOKEN = process.env.HF_TOKEN;
+import HF_TOKEN from "react-native-config";
 
 interface InsightGenerationContext {
   originalText: string;

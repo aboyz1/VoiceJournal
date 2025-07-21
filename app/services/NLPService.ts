@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { Mood } from "../data/schemas";
 import {
   analyzeTextPatterns,
@@ -11,7 +10,7 @@ import {
 
 import { generateUniqueInsights } from "./InsightGenerationService";
 
-const HF_TOKEN = process.env.HF_TOKEN;
+import HF_TOKEN from "react-native-config";
 
 export interface MoodAnalysis {
   mood: Mood;
