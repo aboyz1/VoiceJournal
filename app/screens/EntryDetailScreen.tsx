@@ -1,31 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  SafeAreaView, 
+import { Ionicons } from "@expo/vector-icons";
+import Slider from "@react-native-community/slider";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { Audio, AVPlaybackStatus } from "expo-av";
+import React, { useEffect, useState } from "react";
+import {
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
   TouchableOpacity,
-  ActivityIndicator,
-  ScrollView
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Audio, AVPlaybackStatus } from 'expo-av';
-import Slider from '@react-native-community/slider';
-import { RouteProp, useRoute } from '@react-navigation/native';
-import { RootStackParamList } from '../navigation/AppNavigator';
-import { getEntry } from '../services/StorageService';
-import { JournalEntry } from '../data/schemas';
-import { formatDateTime, formatDuration } from '../utils/dateUtils';
-import { getMoodConfig } from '../utils/moodUtils';
-import { showErrorAlert } from '../utils/alertUtils';
-import { theme } from '../theme/theme';
+  View,
+} from "react-native";
+import { JournalEntry } from "../data/schemas";
+import { RootStackParamList } from "../navigation/AppNavigator";
+import { deleteEntry, getEntry } from "../services/StorageService";
+import { showErrorAlert } from "../utils/alertUtils";
+import { formatDateTime, formatDuration } from "../utils/dateUtils";
+import { getMoodConfig } from "../utils/moodUtils";
 
-type EntryDetailRouteProp = RouteProp<RootStackParamList, 'EntryDetail'>;
+type EntryDetailRouteProp = RouteProp<RootStackParamList, "EntryDetail">;
 
 const EntryDetailScreen = () => {
   const route = useRoute<EntryDetailRouteProp>();
+  const navigation = useNavigation<any>();
   const { entryId } = route.params;
-  
+
   const [entry, setEntry] = useState<JournalEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,8 +40,8 @@ const EntryDetailScreen = () => {
         const loadedEntry = await getEntry(entryId);
         setEntry(loadedEntry);
       } catch (err) {
-        setError('Failed to load journal entry');
-        showErrorAlert('Error', 'Failed to load journal entry');
+        setError("Failed to load journal entry");
+        showErrorAlert("Error", "Failed to load journal entry");
       } finally {
         setLoading(false);
       }
@@ -64,16 +64,16 @@ const EntryDetailScreen = () => {
             { uri: entry.audioUri },
             { shouldPlay: false }
           );
-          
+
           audioSound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
           setSound(audioSound);
-          
+
           const status = await audioSound.getStatusAsync();
           if (status.isLoaded) {
             setDuration(status.durationMillis || 0);
           }
         } catch (err) {
-          console.error('Audio loading error:', err);
+          console.error("Audio loading error:", err);
         }
       };
 
@@ -94,7 +94,7 @@ const EntryDetailScreen = () => {
       if (status.durationMillis) {
         setDuration(status.durationMillis);
       }
-      
+
       if (status.didJustFinish) {
         setIsPlaying(false);
         setPosition(0);
@@ -118,90 +118,182 @@ const EntryDetailScreen = () => {
     setPosition(value);
   };
 
+  const handleDelete = () => {
+    console.log("[EntryDetailScreen] Delete button pressed");
+
+    Alert.alert(
+      "Delete Entry",
+      "Are you sure you want to delete this journal entry? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              console.log("[EntryDetailScreen] Deleting entry:", entryId);
+              await deleteEntry(entryId);
+              console.log("[EntryDetailScreen] Entry deleted successfully");
+              navigation.goBack();
+            } catch (error) {
+              console.error("[EntryDetailScreen] Delete error:", error);
+              showErrorAlert("Error", "Failed to delete entry");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const getMoodDisplayName = (mood: string): string => {
+    const config = getMoodConfig(mood as any);
+    return (
+      config.displayName.charAt(0).toUpperCase() + config.displayName.slice(1)
+    );
+  };
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.secondary} />
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={styles.errorContainer}>
-        <Ionicons name="warning" size={48} color={theme.colors.error} />
-        <Text style={styles.errorText}>{error}</Text>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="warning" size={48} color="#dc2626" />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
   if (!entry) {
     return (
-      <SafeAreaView style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Entry not found</Text>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Entry not found</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
-  const moodConfig = getMoodConfig(entry.mood);
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.dateText}>
-            {formatDateTime(entry.createdAt)}
-          </Text>
-          
-          <View style={[styles.moodContainer, { backgroundColor: moodConfig.color }]}>
-            <Ionicons 
-              name={moodConfig.icon as any} 
-              size={16} 
-              color={theme.colors.surface} 
-            />
-            <Text style={styles.moodText}>{moodConfig.displayName.toUpperCase()}</Text>
-          </View>
-        </View>
-
-        {/* Audio Player */}
-        <View style={styles.audioPlayer}>
-          <TouchableOpacity 
-            style={styles.playButton} 
-            onPress={handlePlayPause}
-            disabled={!sound}
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
           >
-            <Ionicons 
-              name={isPlaying ? "pause" : "play"} 
-              size={24} 
-              color={theme.colors.surface} 
-            />
+            <Ionicons name="chevron-back" size={24} color="#0e141b" />
           </TouchableOpacity>
-          
-          <View style={styles.progressContainer}>
-            <Slider
-              style={styles.slider}
-              minimumValue={0}
-              maximumValue={duration}
-              value={position}
-              onSlidingComplete={handleSliderValueChange}
-              minimumTrackTintColor={theme.colors.secondary}
-              maximumTrackTintColor={theme.colors.border}
-              thumbTintColor={theme.colors.secondary}
-              disabled={!sound}
-            />
-            
-            <View style={styles.timeContainer}>
-              <Text style={styles.timeText}>{formatDuration(position)}</Text>
-              <Text style={styles.timeText}>{formatDuration(duration)}</Text>
-            </View>
-          </View>
+          <Text style={styles.screenTitle}>Journal Entry</Text>
         </View>
 
-        {/* Entry Content */}
-        <View style={styles.contentContainer}>
-          <Text style={styles.contentText}>{entry.text}</Text>
+        {/* Date */}
+        <Text style={styles.dateText}>{formatDateTime(entry.createdAt)}</Text>
+
+        {/* Entry Text */}
+        <Text style={styles.entryText}>
+          {entry.text || "No transcription available"}
+        </Text>
+
+        {/* Mood Analysis */}
+        <Text style={styles.sectionTitle}>Mood Analysis</Text>
+        <View style={styles.moodRow}>
+          <Text style={styles.moodLabel}>{getMoodDisplayName(entry.mood)}</Text>
+          <Text style={styles.moodPercentage}>100%</Text>
         </View>
+
+        {/* Audio Player Card */}
+        {entry.audioUri && (
+          <View style={styles.audioCard}>
+            <View style={styles.audioCardContent}>
+              <View style={styles.audioThumbnail}>
+                <Ionicons name="musical-notes" size={24} color="#0e141b" />
+              </View>
+              <View style={styles.audioInfo}>
+                <Text style={styles.audioTitle}>Journal Entry</Text>
+                <Text style={styles.audioDate}>
+                  {entry.createdAt.toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.playButton}
+                onPress={handlePlayPause}
+                disabled={!sound}
+              >
+                <Ionicons
+                  name={isPlaying ? "pause" : "play"}
+                  size={20}
+                  color="#f8fafc"
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Audio Progress */}
+            {sound && (
+              <View style={styles.progressContainer}>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={0}
+                  maximumValue={duration}
+                  value={position}
+                  onSlidingComplete={handleSliderValueChange}
+                  minimumTrackTintColor="#1978e5"
+                  maximumTrackTintColor="#e7edf3"
+                  thumbTintColor="#1978e5"
+                  disabled={!sound}
+                />
+
+                <View style={styles.timeContainer}>
+                  <Text style={styles.timeText}>
+                    {formatDuration(position)}
+                  </Text>
+                  <Text style={styles.timeText}>
+                    {formatDuration(duration)}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* AI Insights */}
+        <Text style={styles.sectionTitle}>AI Insights</Text>
+        <Text style={styles.insightsText}>
+          This journal entry reflects your emotional state and thoughts from
+          this moment in time.
+        </Text>
       </ScrollView>
+
+      {/* Bottom Actions - Only Delete Button */}
+      <View style={styles.bottomActions}>
+        <View style={styles.actionsGrid}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleDelete}
+            activeOpacity={0.7}
+          >
+            <View style={styles.actionIcon}>
+              <Ionicons name="trash-outline" size={20} color="#0e141b" />
+            </View>
+            <Text style={styles.actionLabel}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.bottomSpacing} />
+      </View>
     </SafeAreaView>
   );
 };
@@ -209,107 +301,253 @@ const EntryDetailScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "#f8fafc",
   },
-  scrollContainer: {
-    padding: theme.spacing.base,
-    paddingBottom: theme.spacing.xl,
-  },
+
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.background,
+    justifyContent: "center",
+    alignItems: "center",
   },
+
+  loadingText: {
+    fontSize: 16,
+    color: "#4e7097",
+  },
+
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing.xl,
-    backgroundColor: theme.colors.background,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
   },
+
   errorText: {
-    fontSize: theme.typography.fontSize.md,
-    color: theme.colors.error,
-    marginTop: theme.spacing.base,
+    fontSize: 16,
+    color: "#dc2626",
+    marginTop: 16,
   },
+
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.background,
+    justifyContent: "center",
+    alignItems: "center",
   },
+
   emptyText: {
-    fontSize: theme.typography.fontSize.md,
-    color: theme.colors.textTertiary,
+    fontSize: 16,
+    color: "#4e7097",
   },
+
+  scrollContainer: {
+    paddingBottom: 120, // Space for bottom actions
+  },
+
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.xl,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingBottom: 8,
   },
-  dateText: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textTertiary,
-  },
-  moodContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.full,
-  },
-  moodText: {
-    color: theme.colors.surface,
-    fontSize: theme.typography.fontSize.xs,
-    fontWeight: '600',
-    marginLeft: theme.spacing.xs,
-  },
-  audioPlayer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.base,
-    marginBottom: theme.spacing.xl,
-    ...theme.shadows.base,
-  },
-  playButton: {
-    backgroundColor: theme.colors.secondary,
+
+  backButton: {
     width: 48,
     height: 48,
-    borderRadius: theme.borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: theme.spacing.base,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  progressContainer: {
+
+  screenTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0e141b",
+    flex: 1,
+    textAlign: "center",
+    marginRight: 48, // Offset for back button
+  },
+
+  dateText: {
+    color: "#4e7097",
+    fontSize: 14,
+    fontWeight: "400",
+    textAlign: "center",
+    paddingBottom: 12,
+    paddingTop: 4,
+    paddingHorizontal: 16,
+  },
+
+  entryText: {
+    color: "#0e141b",
+    fontSize: 16,
+    fontWeight: "400",
+    lineHeight: 24,
+    paddingBottom: 12,
+    paddingTop: 4,
+    paddingHorizontal: 16,
+  },
+
+  sectionTitle: {
+    color: "#0e141b",
+    fontSize: 18,
+    fontWeight: "700",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    paddingTop: 16,
+  },
+
+  moodRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f8fafc",
+    paddingHorizontal: 16,
+    minHeight: 56,
+  },
+
+  moodLabel: {
+    color: "#0e141b",
+    fontSize: 16,
+    fontWeight: "400",
     flex: 1,
   },
+
+  moodPercentage: {
+    color: "#0e141b",
+    fontSize: 16,
+    fontWeight: "400",
+  },
+
+  audioCard: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+
+  audioCardContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    backgroundColor: "#e7edf3",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+
+  audioThumbnail: {
+    width: 56,
+    height: 56,
+    backgroundColor: "#d1d5db",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  audioInfo: {
+    flex: 1,
+  },
+
+  audioTitle: {
+    color: "#0e141b",
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+
+  audioDate: {
+    color: "#4e7097",
+    fontSize: 14,
+    fontWeight: "400",
+  },
+
+  playButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: "#1978e5",
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // Audio progress styles
+  progressContainer: {
+    backgroundColor: "#e7edf3",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+  },
+
   slider: {
-    width: '100%',
+    width: "100%",
     height: 40,
   },
+
   timeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: theme.spacing.xs,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 4,
   },
+
   timeText: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.textTertiary,
+    fontSize: 12,
+    color: "#4e7097",
+    fontWeight: "400",
   },
-  contentContainer: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.base,
-    ...theme.shadows.base,
+
+  insightsText: {
+    color: "#0e141b",
+    fontSize: 16,
+    fontWeight: "400",
+    lineHeight: 24,
+    paddingBottom: 12,
+    paddingTop: 4,
+    paddingHorizontal: 16,
   },
-  contentText: {
-    fontSize: theme.typography.fontSize.md,
-    lineHeight: theme.typography.fontSize.xl,
-    color: theme.colors.textPrimary,
+
+  bottomActions: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#f8fafc",
+  },
+
+  actionsGrid: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    gap: 8,
+    justifyContent: "center", // Center the single delete button
+  },
+
+  actionButton: {
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    paddingVertical: 10,
+    paddingHorizontal: 20, // Add horizontal padding for better touch area
+  },
+
+  actionIcon: {
+    width: 40,
+    height: 40,
+    backgroundColor: "#e7edf3",
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+
+  actionLabel: {
+    color: "#0e141b",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+
+  bottomSpacing: {
+    height: 20,
+    backgroundColor: "#f8fafc",
   },
 });
 export default EntryDetailScreen;
