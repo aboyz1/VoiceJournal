@@ -1,68 +1,52 @@
 import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
+  TextStyle,
   TouchableOpacity,
   View,
   ViewStyle,
-  TextStyle,
+  Alert,
+  TextInput,
 } from "react-native";
-import { RootStackParamList } from "../navigation/AppNavigator";
-import { createEntry, updateEntry, getEntry } from "../services/StorageService";
-import { analyzeText } from "../services/NLPService";
-import { formatDateTime } from "../utils/dateUtils";
-import { getMoodConfig } from "../utils/moodUtils";
-import { isValidText, validateJournalEntry } from "../utils/validationUtils";
-import { showErrorAlert, showSuccessAlert, showUnsavedChangesAlert } from "../utils/alertUtils";
+import { Audio, AVPlaybackStatus } from 'expo-av';
+import Slider from '@react-native-community/slider';
 import { Mood } from "../data/schemas";
-import { theme } from "../theme/theme";
+import { RootStackParamList } from "../navigation/AppNavigator";
+import { analyzeEmotionsComprehensively } from "../services/NLPService";
+import { getEntry, deleteEntry, createEntry, updateEntry } from "../services/StorageService";
+import { showErrorAlert, showSuccessAlert } from "../utils/alertUtils";
+import { formatDateTime, formatDuration } from "../utils/dateUtils";
+import { ComprehensiveMoodAnalysis, getMoodConfig } from "../utils/moodUtils";
+import { isValidText, validateJournalEntry } from "../utils/validationUtils";
 
 type ReviewScreenRouteProp = RouteProp<RootStackParamList, "Review">;
 
-interface MoodData {
-  mood: Mood;
-  confidence: number;
-  description: string;
-  color: string;
-  icon: string;
-}
-
 const ReviewScreen = () => {
-  const [isEditing, setIsEditing] = useState(false);
   const [text, setText] = useState("");
   const [originalText, setOriginalText] = useState("");
-  const [moodData, setMoodData] = useState<MoodData>({
-    mood: "neutral",
-    confidence: 0,
-    description: "Analyzing...",
-    color: theme.colors.textTertiary,
-    icon: "help-circle"
-  });
+  const [moodAnalysis, setMoodAnalysis] = useState<ComprehensiveMoodAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [entryId, setEntryId] = useState<string | null>(null);
-  
-  const route = useRoute<ReviewScreenRouteProp>();
-  const navigation = useNavigation();
-  
-  const audioUri = route.params?.audioUri || '';
-  const existingEntryId = route.params?.entryId;
+  const [entryDate, setEntryDate] = useState<Date>(new Date());
+  const [isEditing, setIsEditing] = useState(false);
 
-  const getMoodData = (mood: Mood, confidence: number): MoodData => {
-    const config = getMoodConfig(mood);
-    return {
-      mood,
-      confidence,
-      description: config.description,
-      color: config.color,
-      icon: config.icon
-    };
-  };
+  // Audio playback state - same as EntryDetailScreen
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [position, setPosition] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const route = useRoute<ReviewScreenRouteProp>();
+  const navigation = useNavigation<any>();
+
+  const audioUri = route.params?.audioUri || "";
+  const existingEntryId = route.params?.entryId;
 
   useEffect(() => {
     const loadExistingEntry = async () => {
@@ -74,98 +58,260 @@ const ReviewScreen = () => {
             setText(entry.text);
             setOriginalText(entry.text);
             setEntryId(entry.id);
-            setMoodData(getMoodData(entry.mood, 0.95));
+            setEntryDate(entry.createdAt);
+            analyzeMood(entry.text);
           }
         } catch (error) {
-          console.error('Error loading entry:', error);
-          showErrorAlert('Error', 'Failed to load journal entry');
+          console.error("Error loading entry:", error);
+          showErrorAlert("Error", "Failed to load journal entry");
         } finally {
           setIsLoading(false);
         }
       } else {
-        const demoText = "This is a demo transcription of your audio entry.";
-        setText(demoText);
-        setOriginalText(demoText);
-        analyzeMood(demoText);
+        // New entry with transcription
+        const initialText = route.params?.transcription || "This is a demo transcription of your audio entry.";
+        setText(initialText);
+        setOriginalText(initialText);
+        analyzeMood(initialText);
       }
     };
-
     loadExistingEntry();
-  }, [existingEntryId]);
 
-  const analyzeMood = async (textToAnalyze: string) => {
-    if (!isValidText(textToAnalyze)) return;
-    
-    try {
-      const analysis = await analyzeText(textToAnalyze);
-      setMoodData(getMoodData(analysis.mood, analysis.confidence));
-    } catch (error) {
-      console.error('Mood analysis error:', error);
-      setMoodData(getMoodData("neutral", 0));
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, [existingEntryId, route.params?.transcription]);
+
+  // Audio loading effect - same as EntryDetailScreen
+  useEffect(() => {
+    if (audioUri) {
+      const loadAudio = async () => {
+        try {
+          const { sound: audioSound } = await Audio.Sound.createAsync(
+            { uri: audioUri },
+            { shouldPlay: false }
+          );
+          
+          audioSound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
+          setSound(audioSound);
+          
+          const status = await audioSound.getStatusAsync();
+          if (status.isLoaded) {
+            setDuration(status.durationMillis || 0);
+          }
+        } catch (err) {
+          console.error('Audio loading error:', err);
+        }
+      };
+
+      loadAudio();
+    }
+
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, [audioUri]);
+
+  // Playback status update - same as EntryDetailScreen
+  const updatePlaybackStatus = (status: AVPlaybackStatus) => {
+    if (status.isLoaded) {
+      setIsPlaying(status.isPlaying);
+      setPosition(status.positionMillis);
+      if (status.durationMillis) {
+        setDuration(status.durationMillis);
+      }
+      
+      if (status.didJustFinish) {
+        setIsPlaying(false);
+        setPosition(0);
+      }
     }
   };
 
-  const handleTextChange = (newText: string) => {
-    setText(newText);
-    
-    const timeoutId = setTimeout(() => {
-      if (newText !== originalText) {
-        analyzeMood(newText);
-      }
-    }, 1000);
+  // Audio controls - same as EntryDetailScreen
+  const handlePlayPause = async () => {
+    if (!sound) return;
 
-    return () => clearTimeout(timeoutId);
+    if (isPlaying) {
+      await sound.pauseAsync();
+    } else {
+      await sound.playAsync();
+    }
+  };
+
+  const handleSliderValueChange = async (value: number) => {
+    if (!sound) return;
+    await sound.setPositionAsync(value);
+    setPosition(value);
+  };
+
+  const analyzeMood = async (textToAnalyze: string) => {
+    if (!isValidText(textToAnalyze)) return;
+
+    try {
+      const comprehensiveAnalysis = await analyzeEmotionsComprehensively(textToAnalyze);
+      setMoodAnalysis({
+        primaryEmotion: {
+          emotion: comprehensiveAnalysis.primaryEmotion.emotion,
+          confidence: comprehensiveAnalysis.primaryEmotion.confidence,
+          intensity: "medium",
+          keywords: [],
+        },
+        summary: comprehensiveAnalysis.summary,
+        insights: comprehensiveAnalysis.insights,
+        secondaryEmotions: comprehensiveAnalysis.secondaryEmotions,
+        overallSentiment: comprehensiveAnalysis.overallSentiment,
+        emotionalComplexity: "simple",
+      });
+    } catch (error) {
+      console.error("Mood analysis error:", error);
+      setMoodAnalysis({
+        primaryEmotion: {
+          emotion: "neutral",
+          confidence: 0,
+          intensity: "medium",
+          keywords: [],
+        },
+        summary: "Unable to analyze emotions at this time.",
+        insights: ["Try writing a bit more to get better emotional insights."],
+        secondaryEmotions: [],
+        overallSentiment: "neutral",
+        emotionalComplexity: "simple",
+      });
+    }
+  };
+
+  const handleEdit = () => {
+    console.log("[ReviewScreen] Edit button pressed");
+    setIsEditing(true);
   };
 
   const handleSave = async () => {
+    console.log("[ReviewScreen] Save button pressed");
+    
+    if (!moodAnalysis) {
+      showErrorAlert("Analysis Error", "Please wait for mood analysis to complete");
+      return;
+    }
+
     const validation = validateJournalEntry({
       text: text.trim(),
       audioUri,
-      mood: moodData.mood
+      mood: moodAnalysis.primaryEmotion.emotion,
     });
 
     if (!validation.isValid) {
-      showErrorAlert('Validation Error', validation.errors.join('\n'));
+      showErrorAlert("Validation Error", validation.errors.join("\n"));
       return;
     }
 
     setIsSaving(true);
-    
+
     try {
       if (entryId) {
+        // Update existing entry
         await updateEntry(entryId, {
           text: text.trim(),
-          mood: moodData.mood
+          mood: moodAnalysis.primaryEmotion.emotion,
         });
-        showSuccessAlert('Success', 'Journal entry updated successfully');
+        showSuccessAlert("Success", "Journal entry updated successfully");
       } else {
+        // Create new entry
         const newEntryId = await createEntry({
           audioUri,
           text: text.trim(),
-          mood: moodData.mood
+          mood: moodAnalysis.primaryEmotion.emotion,
+          duration: route.params?.duration || 0,
         });
         setEntryId(newEntryId);
-        showSuccessAlert('Success', 'Journal entry saved successfully');
+        showSuccessAlert("Success", "Journal entry saved successfully");
       }
-      
+
       setOriginalText(text);
-      if (isEditing) {
-        setIsEditing(false);
+      setIsEditing(false);
+      
+      // Re-analyze mood if text changed
+      if (text.trim() !== originalText.trim()) {
+        analyzeMood(text.trim());
       }
     } catch (error) {
-      console.error('Save error:', error);
-      showErrorAlert('Error', 'Failed to save journal entry. Please try again.');
+      console.error("[ReviewScreen] Save error:", error);
+      showErrorAlert("Error", "Failed to save journal entry. Please try again.");
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleCancelEdit = () => {
+    console.log("[ReviewScreen] Cancel edit");
     setText(originalText);
     setIsEditing(false);
-    if (originalText !== text) {
-      analyzeMood(originalText);
+  };
+
+  const handleDelete = () => {
+    console.log("[ReviewScreen] Delete button pressed");
+    
+    if (!entryId) {
+      // If this is a new entry (not saved yet), just go back
+      Alert.alert(
+        "Discard Entry",
+        "Are you sure you want to discard this journal entry?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Discard", 
+            style: "destructive",
+            onPress: () => navigation.goBack()
+          }
+        ]
+      );
+      return;
     }
+
+    // For existing entries, delete from database
+    Alert.alert(
+      "Delete Entry",
+      "Are you sure you want to delete this journal entry? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              console.log("[ReviewScreen] Deleting entry:", entryId);
+              await deleteEntry(entryId);
+              console.log("[ReviewScreen] Entry deleted successfully");
+              navigation.goBack();
+            } catch (error) {
+              console.error("[ReviewScreen] Delete error:", error);
+              showErrorAlert("Error", "Failed to delete entry");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleTextChange = (newText: string) => {
+    setText(newText);
+    // Debounce mood analysis
+    const timeoutId = setTimeout(() => {
+      if (newText.trim() !== originalText.trim() && newText.trim().length > 10) {
+        analyzeMood(newText.trim());
+      }
+    }, 1500);
+
+    return () => clearTimeout(timeoutId);
+  };
+
+  const getMoodDisplayName = (mood: Mood): string => {
+    const config = getMoodConfig(mood);
+    return config.displayName.charAt(0).toUpperCase() + config.displayName.slice(1);
   };
 
   const hasUnsavedChanges = text.trim() !== originalText.trim();
@@ -183,318 +329,477 @@ const ReviewScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.backButton}
             onPress={() => {
-              if (hasUnsavedChanges && !isEditing) {
-                showUnsavedChangesAlert(
-                  handleSave,
-                  () => navigation.goBack()
+              if (hasUnsavedChanges && isEditing) {
+                Alert.alert(
+                  "Unsaved Changes",
+                  "You have unsaved changes. Do you want to save before leaving?",
+                  [
+                    { text: "Discard", onPress: () => navigation.goBack() },
+                    { text: "Save", onPress: handleSave },
+                    { text: "Cancel", style: "cancel" }
+                  ]
                 );
               } else {
                 navigation.goBack();
               }
             }}
           >
-            <Ionicons name="chevron-back" size={24} color={theme.colors.textPrimary} />
+            <Ionicons name="chevron-back" size={24} color="#0e141b" />
           </TouchableOpacity>
           <Text style={styles.screenTitle}>Journal Entry</Text>
-          <View style={{ width: 24 }} />
         </View>
 
-        <View style={styles.dateContainer}>
-          <Text style={styles.dateText}>
-            {formatDateTime(new Date())}
+        {/* Date */}
+        <Text style={styles.dateText}>
+          {formatDateTime(entryDate)}
+        </Text>
+
+        {/* Entry Text */}
+        {isEditing ? (
+          <TextInput
+            style={styles.textInput}
+            multiline
+            value={text}
+            onChangeText={handleTextChange}
+            placeholder="Enter your journal entry..."
+            placeholderTextColor="#4e7097"
+            autoFocus
+          />
+        ) : (
+          <Text style={styles.entryText}>
+            {text || "No transcription available"}
+          </Text>
+        )}
+
+        {/* Mood Analysis */}
+        <Text style={styles.sectionTitle}>Mood Analysis</Text>
+        <View style={styles.moodRow}>
+          <Text style={styles.moodLabel}>
+            {moodAnalysis ? getMoodDisplayName(moodAnalysis.primaryEmotion.emotion) : "Analyzing..."}
+          </Text>
+          <Text style={styles.moodPercentage}>
+            {moodAnalysis ? `${Math.round(moodAnalysis.primaryEmotion.confidence * 100)}%` : "0%"}
           </Text>
         </View>
 
-        <View style={styles.audioPlayer}>
-          <TouchableOpacity style={styles.playButton}>
-            <Ionicons name="play" size={24} color={theme.colors.surface} />
-          </TouchableOpacity>
-          <View style={styles.progressBar}>
-            <View style={styles.progressFill} />
-          </View>
-          <Text style={styles.durationText}>1:23</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Transcription</Text>
-          {isEditing ? (
-            <TextInput
-              style={styles.textInput as TextStyle}
-              multiline
-              value={text}
-              onChangeText={handleTextChange}
-              autoFocus
-              placeholder="Enter your journal entry..."
-              placeholderTextColor={theme.colors.textDisabled}
-            />
-          ) : (
-            <View style={styles.transcriptionBox}>
-              <Text style={styles.transcriptionText}>
-                {text || "No transcription available"}
-              </Text>
+        {/* Audio Player Card - Updated with EntryDetailScreen style */}
+        {audioUri && (
+          <View style={styles.audioCard}>
+            <View style={styles.audioCardContent}>
+              <View style={styles.audioThumbnail}>
+                <Ionicons name="musical-notes" size={24} color="#0e141b" />
+              </View>
+              <View style={styles.audioInfo}>
+                <Text style={styles.audioTitle}>Journal Entry</Text>
+                <Text style={styles.audioDate}>
+                  {entryDate.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.playButton}
+                onPress={handlePlayPause}
+                disabled={!sound}
+              >
+                <Ionicons 
+                  name={isPlaying ? "pause" : "play"} 
+                  size={20} 
+                  color="#f8fafc" 
+                />
+              </TouchableOpacity>
             </View>
-          )}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mood Analysis</Text>
-          <View style={styles.moodContainer}>
-            <View style={[styles.moodPill, { backgroundColor: moodData.color }]}>
-              <Ionicons name={moodData.icon as any} size={16} color={theme.colors.surface} />
-              <Text style={styles.moodText}>{moodData.mood.toUpperCase()}</Text>
-            </View>
-            <Text style={styles.moodDescription}>
-              {moodData.description}
-            </Text>
+            
+            {/* Audio Progress - Same as EntryDetailScreen */}
+            {sound && (
+              <View style={styles.progressContainer}>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={0}
+                  maximumValue={duration}
+                  value={position}
+                  onSlidingComplete={handleSliderValueChange}
+                  minimumTrackTintColor="#1978e5"
+                  maximumTrackTintColor="#e7edf3"
+                  thumbTintColor="#1978e5"
+                  disabled={!sound}
+                />
+                
+                <View style={styles.timeContainer}>
+                  <Text style={styles.timeText}>{formatDuration(position)}</Text>
+                  <Text style={styles.timeText}>{formatDuration(duration)}</Text>
+                </View>
+              </View>
+            )}
           </View>
-          {moodData.confidence > 0 && (
-            <Text style={styles.confidenceText}>
-              Confidence: {Math.round(moodData.confidence * 100)}%
-            </Text>
-          )}
-        </View>
+        )}
+
+        {/* AI Insights */}
+        <Text style={styles.sectionTitle}>AI Insights</Text>
+        <Text style={styles.insightsText}>
+          {moodAnalysis?.summary || "Your journal entry is being analyzed for emotional insights..."}
+        </Text>
       </ScrollView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => {
-            if (isEditing) {
-              handleCancelEdit();
-            } else {
-              setIsEditing(true);
-            }
-          }}
-          disabled={isSaving}
-        >
-          <Ionicons
-            name={isEditing ? "close" : "create"}
-            size={20}
-            color={theme.colors.secondary}
-          />
-          <Text style={styles.secondaryButtonText}>
-            {isEditing ? "Cancel" : "Edit"}
-          </Text>
-        </TouchableOpacity>
+      {/* Bottom Actions */}
+      <View style={styles.bottomActions}>
+        <View style={styles.actionsGrid}>
+          {isEditing ? (
+            <>
+              {/* Cancel Button */}
+              <TouchableOpacity 
+                style={styles.actionButton} 
+                onPress={handleCancelEdit}
+                activeOpacity={0.7}
+              >
+                <View style={styles.actionIcon}>
+                  <Ionicons name="close" size={20} color="#0e141b" />
+                </View>
+                <Text style={styles.actionLabel}>Cancel</Text>
+              </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.primaryButton, isSaving && styles.disabledButton]}
-          onPress={handleSave}
-          disabled={isSaving}
-        >
-          <Ionicons
-            name={isEditing ? "checkmark" : "save"}
-            size={20}
-            color={theme.colors.surface}
-          />
-          <Text style={styles.buttonText}>
-            {isSaving ? "Saving..." : isEditing ? "Save Changes" : "Save Entry"}
-          </Text>
-        </TouchableOpacity>
+              {/* Save Button */}
+              <TouchableOpacity 
+                style={[styles.actionButton, isSaving && styles.disabledButton]} 
+                onPress={handleSave}
+                activeOpacity={0.7}
+                disabled={isSaving}
+              >
+                <View style={[styles.actionIcon, styles.saveIcon]}>
+                  <Ionicons name="checkmark" size={20} color="#ffffff" />
+                </View>
+                <Text style={[styles.actionLabel, styles.saveLabel]}>
+                  {isSaving ? "Saving..." : "Save"}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Delete Button */}
+              <TouchableOpacity 
+                style={styles.actionButton} 
+                onPress={handleDelete}
+                activeOpacity={0.7}
+              >
+                <View style={styles.actionIcon}>
+                  <Ionicons name="trash-outline" size={20} color="#0e141b" />
+                </View>
+                <Text style={styles.actionLabel}>Delete</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              {/* Edit Button */}
+              <TouchableOpacity 
+                style={styles.actionButton} 
+                onPress={handleEdit}
+                activeOpacity={0.7}
+              >
+                <View style={styles.actionIcon}>
+                  <Ionicons name="pencil" size={20} color="#0e141b" />
+                </View>
+                <Text style={styles.actionLabel}>Edit</Text>
+              </TouchableOpacity>
+              
+              {/* Delete Button */}
+              <TouchableOpacity 
+                style={styles.actionButton} 
+                onPress={handleDelete}
+                activeOpacity={0.7}
+              >
+                <View style={styles.actionIcon}>
+                  <Ionicons name="trash-outline" size={20} color="#0e141b" />
+                </View>
+                <Text style={styles.actionLabel}>Delete</Text>
+              </TouchableOpacity>
+
+              {/* Save Button (for new entries only) */}
+              {!entryId && (
+                <TouchableOpacity 
+                  style={[styles.actionButton, isSaving && styles.disabledButton]} 
+                  onPress={handleSave}
+                  activeOpacity={0.7}
+                  disabled={isSaving}
+                >
+                  <View style={[styles.actionIcon, styles.saveIcon]}>
+                    <Ionicons name="save" size={20} color="#ffffff" />
+                  </View>
+                  <Text style={[styles.actionLabel, styles.saveLabel]}>
+                    {isSaving ? "Saving..." : "Save"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+        </View>
+        <View style={styles.bottomSpacing} />
       </View>
     </SafeAreaView>
   );
 };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: "#f8fafc",
   } as ViewStyle,
+  
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   } as ViewStyle,
+  
   loadingText: {
-    fontSize: theme.typography.fontSize.md,
-    color: theme.colors.textTertiary,
+    fontSize: 16,
+    color: "#4e7097",
   } as TextStyle,
+  
   scrollContainer: {
-    padding: theme.spacing.base,
-    paddingBottom: 80,
+    paddingBottom: 120, // Space for bottom actions
   } as ViewStyle,
+  
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: theme.spacing.xl,
+    backgroundColor: "#f8fafc",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingBottom: 8,
   } as ViewStyle,
+  
   backButton: {
-    padding: theme.spacing.sm,
-  } as ViewStyle,
-  screenTitle: {
-    fontSize: theme.typography.fontSize.xl,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.textPrimary,
-  } as TextStyle,
-  dateContainer: {
-    marginBottom: theme.spacing.lg,
-  } as ViewStyle,
-  dateText: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textTertiary,
-  } as TextStyle,
-  audioPlayer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.base,
-    marginBottom: theme.spacing.xl,
-    shadowColor: theme.shadows.base.shadowColor,
-    shadowOffset: theme.shadows.base.shadowOffset,
-    shadowOpacity: theme.shadows.base.shadowOpacity,
-    shadowRadius: theme.shadows.base.shadowRadius,
-    elevation: theme.shadows.base.elevation,
-  } as ViewStyle,
-  playButton: {
-    backgroundColor: theme.colors.secondary,
-    width: 40,
-    height: 40,
-    borderRadius: theme.borderRadius.full,
+    width: 48,
+    height: 48,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: theme.spacing.base,
   } as ViewStyle,
-  progressBar: {
+  
+  screenTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0e141b",
     flex: 1,
-    height: 4,
-    backgroundColor: theme.colors.border,
-    borderRadius: theme.borderRadius.xs,
-    marginRight: theme.spacing.base,
-  } as ViewStyle,
-  progressFill: {
-    width: "60%",
-    height: "100%",
-    backgroundColor: theme.colors.secondary,
-    borderRadius: theme.borderRadius.xs,
-  } as ViewStyle,
-  durationText: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textTertiary,
+    textAlign: "center",
+    marginRight: 48, // Offset for back button
   } as TextStyle,
-  section: {
-    marginBottom: theme.spacing.xl,
-  } as ViewStyle,
-  sectionTitle: {
-    fontSize: theme.typography.fontSize.md,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.md,
+  
+  dateText: {
+    color: "#4e7097",
+    fontSize: 14,
+    fontWeight: "400",
+    textAlign: "center",
+    paddingBottom: 12,
+    paddingTop: 4,
+    paddingHorizontal: 16,
   } as TextStyle,
-  transcriptionBox: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.base,
-    shadowColor: theme.shadows.base.shadowColor,
-    shadowOffset: theme.shadows.base.shadowOffset,
-    shadowOpacity: theme.shadows.base.shadowOpacity,
-    shadowRadius: theme.shadows.base.shadowRadius,
-    elevation: theme.shadows.base.elevation,
-    minHeight: 100,
-  } as ViewStyle,
-  transcriptionText: {
-    fontSize: theme.typography.fontSize.md,
-    lineHeight: theme.typography.fontSize.xl,
-    color: theme.colors.textSecondary,
+  
+  entryText: {
+    color: "#0e141b",
+    fontSize: 16,
+    fontWeight: "400",
+    lineHeight: 24,
+    paddingBottom: 12,
+    paddingTop: 4,
+    paddingHorizontal: 16,
   } as TextStyle,
+
   textInput: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.base,
-    fontSize: theme.typography.fontSize.md,
-    lineHeight: theme.typography.fontSize.xl,
-    color: theme.colors.textSecondary,
-    minHeight: 150,
+    color: "#0e141b",
+    fontSize: 16,
+    fontWeight: "400",
+    lineHeight: 24,
+    paddingBottom: 12,
+    paddingTop: 4,
+    paddingHorizontal: 16,
+    backgroundColor: "#ffffff",
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    minHeight: 120,
     textAlignVertical: "top",
-    shadowColor: theme.shadows.base.shadowColor,
-    shadowOffset: theme.shadows.base.shadowOffset,
-    shadowOpacity: theme.shadows.base.shadowOpacity,
-    shadowRadius: theme.shadows.base.shadowRadius,
-    elevation: theme.shadows.base.elevation,
-  } as ViewStyle,
-  moodContainer: {
+    borderWidth: 1,
+    borderColor: "#e7edf3",
+  } as TextStyle,
+  
+  sectionTitle: {
+    color: "#0e141b",
+    fontSize: 18,
+    fontWeight: "700",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    paddingTop: 16,
+  } as TextStyle,
+  
+  moodRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: theme.spacing.sm,
+    justifyContent: "space-between",
+    backgroundColor: "#f8fafc",
+    paddingHorizontal: 16,
+    minHeight: 56,
   } as ViewStyle,
-  moodPill: {
+  
+  moodLabel: {
+    color: "#0e141b",
+    fontSize: 16,
+    fontWeight: "400",
+    flex: 1,
+  } as TextStyle,
+  
+  moodPercentage: {
+    color: "#0e141b",
+    fontSize: 16,
+    fontWeight: "400",
+  } as TextStyle,
+  
+  audioCard: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  } as ViewStyle,
+  
+  audioCardContent: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.borderRadius.full,
-    marginRight: theme.spacing.md,
+    gap: 16,
+    backgroundColor: "#e7edf3",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   } as ViewStyle,
-  moodText: {
-    color: theme.colors.surface,
-    fontWeight: theme.typography.fontWeight.semibold,
-    fontSize: theme.typography.fontSize.xs,
-    marginLeft: theme.spacing.xs,
+  
+  audioThumbnail: {
+    width: 56,
+    height: 56,
+    backgroundColor: "#d1d5db",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  } as ViewStyle,
+  
+  audioInfo: {
+    flex: 1,
+  } as ViewStyle,
+  
+  audioTitle: {
+    color: "#0e141b",
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 4,
   } as TextStyle,
-    moodDescription: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textTertiary,
+  
+  audioDate: {
+    color: "#4e7097",
+    fontSize: 14,
+    fontWeight: "400",
   } as TextStyle,
-  confidenceText: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.textTertiary,
-    fontStyle: "italic",
-    marginTop: theme.spacing.xs,
+  
+  playButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: "#1978e5",
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  } as ViewStyle,
+
+  // Audio progress styles - same as EntryDetailScreen
+  progressContainer: {
+    backgroundColor: "#e7edf3",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+  } as ViewStyle,
+
+  slider: {
+    width: '100%',
+    height: 40,
+  } as ViewStyle,
+
+  timeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  } as ViewStyle,
+
+  timeText: {
+    fontSize: 12,
+    color: '#4e7097',
+    fontWeight: '400',
   } as TextStyle,
-  footer: {
+  
+  insightsText: {
+    color: "#0e141b",
+    fontSize: 16,
+    fontWeight: "400",
+    lineHeight: 24,
+    paddingBottom: 12,
+    paddingTop: 4,
+    paddingHorizontal: 16,
+  } as TextStyle,
+  
+  bottomActions: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: theme.spacing.base,
-    backgroundColor: theme.colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    backgroundColor: "#f8fafc",
   } as ViewStyle,
-  primaryButton: {
-    flex: 1,
+  
+  actionsGrid: {
     flexDirection: "row",
+    paddingHorizontal: 16,
+    gap: 8,
+  } as ViewStyle,
+  
+  actionButton: {
+    flex: 1,
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    paddingVertical: 10,
+  } as ViewStyle,
+  
+  actionIcon: {
+    width: 40,
+    height: 40,
+    backgroundColor: "#e7edf3",
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: theme.colors.secondary,
-    paddingVertical: theme.spacing.sm + 2,
-    borderRadius: theme.borderRadius.md,
-    marginLeft: theme.spacing.sm,
+    marginBottom: 8,
   } as ViewStyle,
-  secondaryButton: {
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: theme.spacing.sm + 2,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.secondary,
-    marginRight: theme.spacing.sm,
+
+  saveIcon: {
+    backgroundColor: "#1978e5",
   } as ViewStyle,
+  
+  actionLabel: {
+    color: "#0e141b",
+    fontSize: 14,
+    fontWeight: "500",
+  } as TextStyle,
+
+  saveLabel: {
+    color: "#1978e5",
+    fontWeight: "600",
+  } as TextStyle,
+
   disabledButton: {
-    backgroundColor: theme.colors.processing,
     opacity: 0.6,
   } as ViewStyle,
-  buttonText: {
-    color: theme.colors.surface,
-    fontWeight: theme.typography.fontWeight.semibold,
-    fontSize: theme.typography.fontSize.md,
-    marginLeft: theme.spacing.sm,
-  } as TextStyle,
-  secondaryButtonText: {
-    color: theme.colors.secondary,
-    fontWeight: theme.typography.fontWeight.semibold,
-    fontSize: theme.typography.fontSize.md,
-    marginLeft: theme.spacing.sm,
-  } as TextStyle,
+  
+  bottomSpacing: {
+    height: 20,
+    backgroundColor: "#f8fafc",
+  } as ViewStyle,
 });
 
 export default ReviewScreen;
